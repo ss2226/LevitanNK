@@ -1,5 +1,5 @@
 /* Levitan_nk.c
-   
+
    Version 2.0 of NK model with noisy fitness evaluations
    Author: Bennett Levitan
    Last modified: 12/20/94
@@ -60,479 +60,771 @@
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 /* Enumerations */
-  enum ag_dist {identical, random, adjacent, skewed, uniform};
-  typedef enum ag_dist	ag_dist;
+enum ag_dist {identical, random, adjacent, skewed, uniform};
+typedef enum ag_dist	ag_dist;
 
 /* Function prototypes */
-  void   set_defaults(void);
-  int    check_params(void);
-  void   init_vars(LOCUS_TYPE *agents[]);
-  void   print_usage(void);
-  void   init_agents(LOCUS_TYPE *agents[]);
-  void   print_agent(LOCUS_TYPE *agent, int agent_number);
-	void   set_epi_locs(short *eloc);
-  // void   set_epi_locs(void);
-  void   set_seeds(void);
-	double calc_fit(LOCUS_TYPE *agent);
-  double noise(double fitness);
-  void   walk_agents(LOCUS_TYPE *agents[]);
-  void   collect_stats(int try, LOCUS_TYPE *agents[]);
-  void   loop_all_neigh(LOCUS_TYPE *agent, int distance, int loop_loc);
-  void   find_any_neighbor(LOCUS_TYPE *new_guy, LOCUS_TYPE *agent);
-  float  gasdev(double standard_deviation);
-  void   write_results(LOCUS_TYPE *agents[]);
-  int    hamming(LOCUS_TYPE *agent1, LOCUS_TYPE *agent2);
-  void   raise_flags(int flag_number, LOCUS_TYPE *agents[]);
-  void   print_flags(int flag_number);
-  void   find_peaks(void);
-  void   find_peaks_neigh(LOCUS_TYPE *agent, int distance, int loop_loc);
-  int    is_peak(LOCUS_TYPE *agent, double agents_fitness);
-  void   next_point(LOCUS_TYPE *guy);
-  long   new_random_point(LOCUS_TYPE *agent);
-  long   calc_index(LOCUS_TYPE *agent);
-  void   index_to_agent(LOCUS_TYPE *agent, long index);
-  void   close_files_free_memory(LOCUS_TYPE *agents[]);
+void   set_defaults(void);
+int    check_params(void);
+void   init_vars(LOCUS_TYPE *agents[]);
+void   print_usage(void);
+void   init_agents(LOCUS_TYPE *agents[]);
+void   print_agent(LOCUS_TYPE *agent, int agent_number);
+void   set_epi_locs(short *eloc);
+// void   set_epi_locs(void);
+void   set_seeds(void);
+double calc_fit(LOCUS_TYPE *agent);
+double noise(double fitness);
+void   walk_agents(LOCUS_TYPE *agents[]);
+void   collect_stats(int try, LOCUS_TYPE *agents[]);
+void   loop_all_neigh(LOCUS_TYPE *agent, int distance, int loop_loc);
+void   find_any_neighbor(LOCUS_TYPE *new_guy, LOCUS_TYPE *agent);
+float  gasdev(double standard_deviation);
+void   write_results(LOCUS_TYPE *agents[]);
+int    hamming(LOCUS_TYPE *agent1, LOCUS_TYPE *agent2);
+void   raise_flags(int flag_number, LOCUS_TYPE *agents[]);
+void   print_flags(int flag_number);
+void   find_peaks(void);
+void   find_peaks_neigh(LOCUS_TYPE *agent, int distance, int loop_loc);
+int    is_peak(LOCUS_TYPE *agent, double agents_fitness);
+void   next_point(LOCUS_TYPE *guy);
+long   new_random_point(LOCUS_TYPE *agent);
+long   calc_index(LOCUS_TYPE *agent);
+void   index_to_agent(LOCUS_TYPE *agent, long index);
+void   close_files_free_memory(LOCUS_TYPE *agents[]);
 
 /* External function declarations */
-  extern long   seed_random();
-  extern double knuth_random();
-  extern void   get_random_state(void);
-  extern void   put_random_state(void);
+extern long   seed_random();
+extern double knuth_random();
+extern void   get_random_state(void);
+extern void   put_random_state(void);
 
 /* External (global) variables */
-  int     N, K, A, max_neigh_dist, num_repeat_fit, DEBUG=0;
-  int     num_agents, max_walk_length, num_repeat_walk, walk_iteration;
-  char    *epi_locs, *noise_density, *epi_density;
-  char    *adaptive_walk, *out_filename, *agent_dist_term;
-  ag_dist agent_distribution;
-  short   *eloc;                                  /* locations of epistatic dependencies */
-  long    *nseed, *kseed;               /* random number seeds for calculating fitnesses */
-  long    seed;                   /* random number seed for the first walk and landscape */
-  float   noise_var;                                           /* fitness noise variance */
-  double  stand_dev;                                         /* Noise standard deviation */
-  float   noise_gain;      /* Constant used by noise() for noise's dependence on fitness */
-  double  noisy_fitness[MAX_AGENTS];		   /* Noisy fitness of agents at present */
-  double  true_fitness[MAX_AGENTS];		    /* True fitness of agents at present */
-  int     num_bins;                        /* number of bins to break fitness range into */
-  int     num_points_per_bin;                        /* number of agents per fitness bin */
-  long    points_left;                                       /* Used by new_random_point() */
-  long    *points_list;                                      /* Used by new_random_point() */
+int     N, K, A, max_neigh_dist, num_repeat_fit, DEBUG=0;
+int     num_agents, max_walk_length, num_repeat_walk, walk_iteration;
+char    epi_locs[100], noise_density[100], epi_density[100];
+char    adaptive_walk[100], out_filename[100], agent_dist_term[100];
+ag_dist agent_distribution;
+short   *eloc;                                  /* locations of epistatic dependencies */
+long    *nseed, *kseed;               /* random number seeds for calculating fitnesses */
+long    seed;                   /* random number seed for the first walk and landscape */
+float   noise_var;                                           /* fitness noise variance */
+double  stand_dev;                                         /* Noise standard deviation */
+float   noise_gain;      /* Constant used by noise() for noise's dependence on fitness */
+double  noisy_fitness[MAX_AGENTS];		   /* Noisy fitness of agents at present */
+double  true_fitness[MAX_AGENTS];		    /* True fitness of agents at present */
+int     num_bins;                        /* number of bins to break fitness range into */
+int     num_points_per_bin;                        /* number of agents per fitness bin */
+long    points_left;                                       /* Used by new_random_point() */
+long    *points_list;                                      /* Used by new_random_point() */
 
 /* Results variables - external */
-  int    pole_dist, store_fits, store_flags, store_agents, store_hamming, store_histo;
-  int    store_landhisto;
-  double *avg_fit;                                     /* average fitness per generation */
-  double *max_fit;                                     /* maximum fitness per generation */
-  double *tr_fit;                                 /* average true fitness per generation */
-  double *cum_avg_fit;                      /* cumulative average fitness per generation */
-  double *cum_max_fit;                      /* cumulative maximum fitness per generation */
-  double *cum_tr_fit;                          /* cumulative true fitness per generation */
-  double *dif_fit;          /* Error in fitness at a generation - for num_agents==1 only */
-  LOCUS_TYPE *flagpoles;                            /* Signposts along the adaptive walk */
-  int flag_number;                                /* Which set of signposts we are using */
-  int num_poles;                                /* Number of flaagpoles raised per agent */
-  int num_peaks;                                          /* Number of local peaks found */
-  int *peak_dists;                           /* Distances between agents and local peaks */
-  LOCUS_TYPE *peaks[MAX_PEAKS];					   /* Locations of peaks */
-  char    histofilename[40];                     /* Name of terminal tfit histogram file */
-  int     hist_number;
-  int     histo_freq;
-  FILE    *fitsfp;                                      /* Average and maximum fitnesses */
-  FILE    *polefp;                                             /* Pole Hamming distances */
-  FILE    *agentsfp;                                                  /* Agent genotypes */
-  FILE    *hammingfp;                                               /* Hamming distances */
-  FILE    *histofp;                            /* Histogram of final true fitness values */
-  FILE    *landfp;                                    /* Histogram of all fitness values */
+int    pole_dist, store_fits, store_flags, store_agents, store_hamming, store_histo;
+int    store_landhisto;
+double *avg_fit;                                     /* average fitness per generation */
+double *max_fit;                                     /* maximum fitness per generation */
+double *tr_fit;                                 /* average true fitness per generation */
+double *cum_avg_fit;                      /* cumulative average fitness per generation */
+double *cum_max_fit;                      /* cumulative maximum fitness per generation */
+double *cum_tr_fit;                          /* cumulative true fitness per generation */
+double *dif_fit;          /* Error in fitness at a generation - for num_agents==1 only */
+LOCUS_TYPE *flagpoles;                            /* Signposts along the adaptive walk */
+int flag_number;                                /* Which set of signposts we are using */
+int num_poles;                                /* Number of flaagpoles raised per agent */
+int num_peaks;                                          /* Number of local peaks found */
+int *peak_dists;                           /* Distances between agents and local peaks */
+LOCUS_TYPE *peaks[MAX_PEAKS];					   /* Locations of peaks */
+char    histofilename[40];                     /* Name of terminal tfit histogram file */
+int     hist_number;
+int     histo_freq;
+FILE    *fitsfp;                                      /* Average and maximum fitnesses */
+FILE    *polefp;                                             /* Pole Hamming distances */
+FILE    *agentsfp;                                                  /* Agent genotypes */
+FILE    *hammingfp;                                               /* Hamming distances */
+FILE    *histofp;                            /* Histogram of final true fitness values */
+FILE    *landfp;                                    /* Histogram of all fitness values */
 
 /* Externals for the adaptive walk */
-  double w_best_noisy_fit;
-  double w_best_true_fit;
-  LOCUS_TYPE *w_best_guy;
+double w_best_noisy_fit;
+double w_best_true_fit;
+LOCUS_TYPE *w_best_guy;
 
-main(int argc, char **argv)
-{
-  LOCUS_TYPE *agents[MAX_AGENTS];            /* pointer to agents, allocated with calloc */
-  int i, j, k, n_train=0, n_interp=0, n_picks;
-  FILE *fil_t_x, *fil_t_y, *fil_i_x, *fil_i_y;
-  int *pick_list, m, loc;
-  double mn=0.0, sd=0.0, temp=0.0;
-  char fname[80];
-
-  printf("\nLevitan/Kauffman NK model:   (c) 1994-6 Bennett Levitan\n");
-
-  set_defaults();
-  // Add your own code to read in parameters
-  if (check_params()>0) {
-		printf("Aborting\n");
-	  exit(-1);
+/*
+ * read default values from a file
+ */
+int read_defaults_from_file(char *fileName){
+	int err = 0;
+	FILE *fd;
+	if((fd = fopen(fileName,"r")) == NULL){
+		printf("Unable to open input file %s\n",fileName);
+		err++;
+	} else {
+		char line[100];
+		char *options[] = {"N","K","A","epi_locs","epi_density","noise_density","noise_gain",
+				"agent_distribution","agent_dist_term","adaptive_walk","max_neigh_dist","num_repeat_fit",
+				"noise_var","num_agents","max_walk_length","out_filename","seed","num_repeat_walk",
+				"pole_dist","histo_freq","num_bins","store_fits","store_flags","store_agents","store_hamming",
+				"store_histo","store_landhisto","DEBUG"};
+		while(fgets(line,100,fd) != NULL){
+			// printf("Line: %s\n",line);
+			char optionName[50],optionValue[50];
+			if(sscanf(line,"%s = %s",optionName,optionValue) != 2){
+				printf("Unable to interpret line %s",line);
+				err++;
+				break;
+			}
+			for(int i = 0; i < (sizeof options) / (sizeof *options) ; i++){
+				// printf("comparing %d %s %s\n",i,optionName,options[i]);
+				if(strcmp(options[i],optionName) == 0){
+					switch(i){
+					case 0:
+						N = atoi(optionValue);
+						break;
+					case 1:
+						K = atoi(optionValue);
+						break;
+					case 2:
+						A = atoi(optionValue);
+						break;
+					case 3:
+						strcpy(epi_locs,optionValue);
+						break;
+					case 4:
+						strcpy(epi_density,optionValue);
+						break;
+					case 5:
+						strcpy(noise_density,optionValue);
+						break;
+					case 6:
+						noise_gain = atof(optionValue);
+						break;
+					case 7:
+						strcpy(agent_dist_term,optionValue);
+						break;
+					case 8:
+						switch(optionValue[0]){
+						case 'i':
+							agent_distribution = identical;
+							break;
+						case 'r':
+							agent_distribution = random;
+							break;
+						case 'a':
+							agent_distribution = adjacent;
+							break;
+						case 's':
+							agent_distribution = skewed;
+							break;
+						case 'u':
+							agent_distribution = uniform;
+							break;
+						default:
+							printf("unknown type %s\n",optionValue);
+							break;
+						}
+						break;
+						case 9:
+							strcpy(adaptive_walk,optionValue);
+							break;
+						case 10:
+							max_neigh_dist = atoi(optionValue);
+							break;
+						case 11:
+							num_repeat_fit = atoi(optionValue);
+							break;
+						case 12:
+							noise_var = atof(optionValue);
+							break;
+						case 13:
+							num_agents = atoi(optionValue);
+							break;
+						case 14:
+							max_walk_length = atoi(optionValue);
+							break;
+						case 15:
+							strcpy(out_filename,optionValue);
+							// printf("Output file: %s\n",out_filename);
+							break;
+						case 16:
+							seed = atol(optionValue);
+							break;
+						case 17:
+							num_repeat_walk = atoi(optionValue);
+							break;
+						case 18:
+							pole_dist = atoi(optionValue);
+							break;
+						case 19:
+							histo_freq = atoi(optionValue);
+							break;
+						case 20:
+							num_bins = atoi(optionValue);
+							break;
+						case 21:
+							store_fits = atoi(optionValue);
+							break;
+						case 22:
+							store_flags = atoi(optionValue);
+							break;
+						case 23:
+							store_agents= atoi(optionValue);
+							break;
+						case 24:
+							store_hamming = atoi(optionValue);
+							break;
+						case 25:
+							store_histo = atoi(optionValue);
+							break;
+						case 26:
+							store_landhisto = atoi(optionValue);
+							break;
+						case 27:
+							DEBUG = atoi(optionValue);
+							break;
+						default:
+							printf("internal error");
+							err++;
+							break;
+					}
+					printf("%d %s %s\n",i,optionName,optionValue);
+				}
+			}
+		}
+		fclose(fd);
 	}
+	return err;
+}
 
-#if 1
-  // Hack to pull in command line params
-  N = atoi(argv[1]);
-  K = atoi(argv[2]);
-  A = atoi(argv[3]);
-  max_walk_length = atoi(argv[4]);
-  num_repeat_walk = atoi(argv[5]);
-#endif
+/*
+ * Set global variables based on command line arguments
+ */
+int getArgs(int argc, char **argv){
+	int err = 0;
+	for(int i=0; i < argc; i++){
+		if(argv[i][0] == '-'){
+			if(argv[i][1] != 'D' && i > argc-1){
+				printf("Missing value after %s\n",argv[i]);
+				err++;
+				break;
+			}
+			switch(argv[i][1]){
+			case 'A':
+				A = atoi(argv[++i]);
+				break;
+			case 'a':
+				num_agents = atoi(argv[++i]);
+				break;
+			case 'b':
+				num_bins = atoi(argv[++i]);
+				break;
+			case 'c':
+				for(int j=0; j < strlen(argv[i+1]); j++){
+					switch(argv[i+1][j]){
+					case 'a':
+						store_agents = 1;
+						break;
+					case 'f':
+						store_fits = 1;
+						break;
+					case 'H':
+						store_hamming = 1;
+						break;
+					case 'h':
+						store_histo = 1;
+						break;
+					case 'p':
+						store_flags = 1;
+						break;
+					default:
+						printf("Unknown flag -c %c\n",argv[i+1][j]);
+						err++;
+						break;
+					}
+				}
+				i++;
+				break;
+			case 'D':
+				DEBUG = (i < argc-1 && argv[i+1][0] != '-') ? atoi(argv[++i]) : 1;
+				break;
+			case 'd':
+				strcpy(agent_dist_term,argv[++i]);
+				switch(agent_dist_term[0]){
+				case 'i':
+					agent_distribution = identical;
+					break;
+				case 'r':
+					agent_distribution = random;
+					break;
+				case 'a':
+					agent_distribution = adjacent;
+					break;
+				case 's':
+					agent_distribution = skewed;
+					break;
+				case 'u':
+					agent_distribution = uniform;
+					break;
+				default:
+					printf("unknown type %s\n",agent_dist_term);
+					break;
+				}
+				break;
+				case 'e':
+					max_walk_length = atoi(argv[++i]);
+					break;
+				case 'f':
+					histo_freq = atoi(argv[++i]);
+					break;
+				case 'g':
+					noise_gain = atof(argv[++i]);
+					break;
+				case 'h':
+					print_usage();
+					exit(0);
+				case 'i':
+					if(read_defaults_from_file(argv[++i]) > 0){
+						err++;
+						exit(-1);
+					}
+					break;
+				case 'K':
+					K = atoi(argv[++i]);
+					break;
+				case 'L':
+					strcpy(epi_locs,argv[++i]);
+					break;
+				case 'm':
+					max_neigh_dist = atoi(argv[++i]);
+					break;
+				case 'n':
+					strcpy(noise_density,argv[++i]);
+					break;
+				case 'N':
+					N = atoi(argv[++i]);
+					break;
+				case 'o':
+					strcpy(out_filename,argv[++i]);
+					break;
+				case 'p':
+					pole_dist = atoi(argv[++i]);
+					break;
+				case 'R':
+					num_repeat_walk = atoi(argv[++i]);
+					break;
+				case 'r':
+					num_repeat_fit = atoi(argv[++i]);
+					break;
+				case 's':
+					seed = atol(argv[++i]);
+					break;
+				case 'V':
+					noise_var = atof(argv[++i]);
+					break;
+				case 'W':
+					strcpy(adaptive_walk,argv[++i]);
+					break;
+				case 'w':
+					strcpy(epi_density,argv[++i]);
+					break;
+				default:
+					printf("Unknown argument %s\n",argv[i]);
+					err++;
+					break;
+			}
+		}
+	}
+	return err;
+}
 
-  printf("N=%d K=%d n=%s v=%f R=%d e=%d A=%d g=%f s=%d a=%d d=%c L=%c m=%d\n\n",
-	 N, K, noise_density, noise_var, num_repeat_walk, max_walk_length, A, noise_gain, seed,
-	 num_agents, agent_dist_term[0], epi_locs[0], max_neigh_dist);
-  
-  init_vars(agents);
-    
-  for (walk_iteration=0; walk_iteration<num_repeat_walk; walk_iteration++) {
-//    printf("Walk #%3d\n", walk_iteration);
-    
-   /* printf("SETTING EPI_LOCS\n");*/
-    set_epi_locs(eloc);
-    set_seeds();
-    
+
+int main(int argc, char **argv)
+{
+	LOCUS_TYPE *agents[MAX_AGENTS];            /* pointer to agents, allocated with calloc */
+	int i, j, k, n_train=0, n_interp=0, n_picks;
+	FILE *fil_t_x, *fil_t_y, *fil_i_x, *fil_i_y;
+	int *pick_list, m, loc;
+	double mn=0.0, sd=0.0, temp=0.0;
+	char fname[80];
+
+	printf("\nLevitan/Kauffman NK model:   (c) 1994-6 Bennett Levitan\n");
+	if(argc < 2){
+		print_usage();
+		exit(0);
+	}
+	set_defaults();
+	if(getArgs(argc,argv) > 0 || check_params() > 0) {
+		printf("Aborting\n");
+		exit(-1);
+	}
+	printf("N=%d K=%d n=%s v=%f R=%d e=%d A=%d g=%f s=%ld a=%d d=%c L=%c m=%d\n\n",
+			N, K, noise_density, noise_var, num_repeat_walk, max_walk_length, A, noise_gain, seed,
+			num_agents, agent_dist_term[0], epi_locs[0], max_neigh_dist);
+
+	init_vars(agents);
+	// we added this....
+	printf("Initializing agents..");
+	fflush(stdout);
+	init_agents(agents);
+	printf("done\n");
+	fflush(stdout);
+	for (walk_iteration=0; walk_iteration<num_repeat_walk; walk_iteration++) {
+		 printf("Walk #%3d\n", walk_iteration);
+
+		printf("SETTING EPI_LOCS\n");
+		fflush(stdout);
+		set_epi_locs(eloc);
+		printf("done\n Setting Seeds\n");
+		fflush(stdout);
+		set_seeds();
+		printf("done\nWalk agents\n");
+		fflush(stdout);
+
 #if 0
-    // Write the entire landscape with normalized fitnesses
-    fil_t_x = fopen("nk_x.dat", "w");
-    fil_t_y = fopen("nk_y.dat", "w");
+		// Write the entire landscape with normalized fitnesses
+		fil_t_x = fopen("nk_x.dat", "w");
+		fil_t_y = fopen("nk_y.dat", "w");
 
-    for (i=0; i<N; i++)
-      agents[0][i]=0;
-    
-    // Get mean and s.d.
-    for (i=0; i<(int)pow(2,N); i++) {
-      temp = calc_fit(agents[0]);
-      mn += temp;
-      sd += temp*temp;
-      next_point(agents[0]);
-    }
-    mn /= pow(2,N);
-    sd = sqrt(sd/(pow(2,N))-mn*mn);
-    printf("mn=%f sd=%f\n", mn, sd);
-    
-    for (i=0; i<(int)pow(2,N); i++) {
-      for (j=0; j<N; j++)
-        fprintf(fil_t_x, "%1d ", agents[0][j]);
-      fprintf(fil_t_x, "\n");
-      fprintf(fil_t_y, "%f\n", (calc_fit(agents[0])-mn)/sd);
-      next_point(agents[0]);
-    }
-    exit(0);
+		for (i=0; i<N; i++)
+			agents[0][i]=0;
+
+		// Get mean and s.d.
+		for (i=0; i<(int)pow(2,N); i++) {
+			temp = calc_fit(agents[0]);
+			mn += temp;
+			sd += temp*temp;
+			next_point(agents[0]);
+		}
+		mn /= pow(2,N);
+		sd = sqrt(sd/(pow(2,N))-mn*mn);
+		printf("mn=%f sd=%f\n", mn, sd);
+
+		for (i=0; i<(int)pow(2,N); i++) {
+			for (j=0; j<N; j++)
+				fprintf(fil_t_x, "%1d ", agents[0][j]);
+			fprintf(fil_t_x, "\n");
+			fprintf(fil_t_y, "%f\n", (calc_fit(agents[0])-mn)/sd);
+			next_point(agents[0]);
+		}
+		exit(0);
 #endif
-    
-    
-    [1](agents);
-    if (store_hamming)
-      find_peaks();
-    walk_agents(agents);
-    write_results(agents);
-    seed++;
-  }
-  close_files_free_memory(agents);
-  printf("\n");
-  return (0);
+
+
+		// [1](agents);
+		if (store_hamming)
+			find_peaks();
+
+		walk_agents(agents);
+		printf("done\nwrite results\n");
+				fflush(stdout);
+				write_results(agents);
+		seed++;
+	}
+	close_files_free_memory(agents);
+	printf("\n");
+	return (0);
 }
 
 void set_defaults(void)
 /* Set default values for command line option variables */
 {
-  N = 20;
-  K = 19;
-  A = 2;
-  epi_locs = "adjacent";
-  epi_density = "uniform";
-  noise_density = "none";
-  noise_gain = 0.0;
-  agent_distribution = identical;
-  agent_dist_term = "identical";
-  adaptive_walk = "random";
-  max_neigh_dist = N;
-  num_repeat_fit = 3;
-  noise_var = (float)0.001;
-  num_agents = 1;
-  max_walk_length = 500;
-  out_filename = "nkdat";
-  seed = 3;
-  num_repeat_walk = 1;
-  pole_dist = 25;
-  histo_freq = 10;
-  num_bins = 30;
-  store_fits = 0;
-  store_flags = 0;
-  store_agents= 0;
-  store_hamming = 0;
-  store_histo = 0;
-  store_landhisto = 0;
+	N = 20;
+	K = 19;
+	A = 2;
+	strcpy(epi_locs,"adjacent");
+	strcpy(epi_density,"uniform");
+	strcpy(noise_density,"none");
+	noise_gain = 0.0;
+	agent_distribution = identical;
+	strcpy(agent_dist_term,"identical");
+	strcpy(adaptive_walk,"random");
+	max_neigh_dist = N;
+	num_repeat_fit = 3;
+	noise_var = (float)0.001;
+	num_agents = 1;
+	max_walk_length = 500;
+	strcpy(out_filename,"nkdat");
+	seed = 3;
+	num_repeat_walk = 1;
+	pole_dist = 25;
+	histo_freq = 10;
+	num_bins = 30;
+	store_fits = 0;
+	store_flags = 0;
+	store_agents= 0;
+	store_hamming = 0;
+	store_histo = 0;
+	store_landhisto = 0;
 }
 
 int check_params(void)
 {
- int errflg = 0;
- 
- if (K>=N) {
-    printf("Error: K (%d) must be smaller than N (%d).\n", K, N);
-    errflg++;
-  }
-  if (max_neigh_dist>N) {
-    printf("Error: maximum mutant search distance (%d) can not be larger than N (%d).\n", max_neigh_dist, N);
-    errflg++;
-  }
+	int errflg = 0;
 
-  if (store_hamming & ((num_agents>1) || (num_repeat_walk>1))) {
-    printf("Error: can not store agent Hamming distances to peaks for more than one agent or more than one walk.\n");
-    errflg++;
-  }
+	if (K>=N) {
+		printf("Error: K (%d) must be smaller than N (%d).\n", K, N);
+		errflg++;
+	}
+	if (max_neigh_dist>N) {
+		printf("Error: maximum mutant search distance (%d) can not be larger than N (%d).\n", max_neigh_dist, N);
+		errflg++;
+	}
 
-  if (store_agents & ((num_agents>1) || (num_repeat_walk>1))) {
-    printf("Error: can not store agent genotypes for more than one agent or more than one walk.\n");
-    errflg++;
-  }
+	if (store_hamming & ((num_agents>1) || (num_repeat_walk>1))) {
+		printf("Error: can not store agent Hamming distances to peaks for more than one agent or more than one walk.\n");
+		errflg++;
+	}
 
-  if (store_flags & ((num_agents>1) || (num_repeat_walk>1))) {
-    printf("Error: can not compute flagpole distances for more than one agent or more than one walk.\n");
-    errflg++;
-  }
+	if (store_agents & ((num_agents>1) || (num_repeat_walk>1))) {
+		printf("Error: can not store agent genotypes for more than one agent or more than one walk.\n");
+		errflg++;
+	}
 
-  if ((store_landhisto) & (agent_distribution != uniform)) {
-    printf("Sorry: Can only store histogram of all fitness values when a uniform agent distribution is specified,\n");
-    errflg++;
-  }
+	if (store_flags & ((num_agents>1) || (num_repeat_walk>1))) {
+		printf("Error: can not compute flagpole distances for more than one agent or more than one walk.\n");
+		errflg++;
+	}
 
-  if (agent_distribution == uniform)
-    if (num_agents % num_bins) {
-      printf("Error: For uniform agent distributions, the number of agents must divide equally among the fitness bins,\n");
-      errflg++;
-    }
-    else
-      num_points_per_bin = (int)floor(num_agents/num_bins);
-  return (errflg);
+	if ((store_landhisto) & (agent_distribution != uniform)) {
+		printf("Sorry: Can only store histogram of all fitness values when a uniform agent distribution is specified,\n");
+		errflg++;
+	}
+
+	if (agent_distribution == uniform){
+		if (num_agents % num_bins) {
+			printf("Error: For uniform agent distributions, the number of agents must divide equally among the fitness bins,\n");
+			errflg++;
+		} else {
+			num_points_per_bin = (int)floor(num_agents/num_bins);
+		}
+	}
+	return (errflg);
 }
 
 void init_vars(LOCUS_TYPE *agents[])
 /* Allocate memory for variables, seed knuth_random() & do other initialization tasks */
 {
-  int i;
-  char filename[40];
+	int i;
+	char filename[100];
 
-  /* Seed the random number generator */
-  seed_random(seed);
+	/* Seed the random number generator */
+	seed_random(seed);
 
-  /* Define the standard deviation of the noise */
-  stand_dev = sqrt(noise_var);
+	/* Define the standard deviation of the noise */
+	stand_dev = sqrt(noise_var);
 
-  /* Allocate storage for the agents */
-  for (i=0; i<num_agents; i++)
-    if ((agents[i] = (LOCUS_TYPE *) calloc(1, N *sizeof(LOCUS_TYPE))) == NULL) {
-      printf("Unable to allocate sufficient memory for agents.\nAborting.\n");
-      exit(-1);
-    }
+	/* Allocate storage for the agents */
+	for (i=0; i<num_agents; i++)
+		if ((agents[i] = (LOCUS_TYPE *) calloc(1, N *sizeof(LOCUS_TYPE))) == NULL) {
+			printf("Unable to allocate sufficient memory for agents.\nAborting.\n");
+			exit(-1);
+		}
 
-  /* Allocate storage for the epistatic dependency locations array */
-  if ((eloc = (short *) calloc(1, N * K * sizeof(short))) == NULL) {
-    printf("Unable to allocate sufficient memory for eloc.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the epistatic dependency locations array */
+	if ((eloc = (short *) calloc(1, N * K * sizeof(short))) == NULL) {
+		printf("Unable to allocate sufficient memory for eloc.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for nseed array */
-  if ((nseed = (long *) calloc(1, N * sizeof(long))) == NULL) {
-    printf("Unable to allocate sufficient memory for nseed.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for nseed array */
+	if ((nseed = (long *) calloc(1, N * sizeof(long))) == NULL) {
+		printf("Unable to allocate sufficient memory for nseed.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for kseed array */
-  if ((kseed = (long *) calloc(1, N * sizeof(long))) == NULL) {
-    printf("Unable to allocate sufficient memory for nseed.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for kseed array */
+	if ((kseed = (long *) calloc(1, N * sizeof(long))) == NULL) {
+		printf("Unable to allocate sufficient memory for nseed.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate memory to store the interim best mutant found in the adaptive_walk. */
-  if ((w_best_guy = (LOCUS_TYPE *) calloc(1, N * sizeof(LOCUS_TYPE))) == NULL) {
-    printf("Unable to allocate sufficient memory for w_nest_guy.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate memory to store the interim best mutant found in the adaptive_walk. */
+	if ((w_best_guy = (LOCUS_TYPE *) calloc(1, N * sizeof(LOCUS_TYPE))) == NULL) {
+		printf("Unable to allocate sufficient memory for w_nest_guy.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for list of indexes of points in the landscape - for new_random_point() */
-  if (agent_distribution == uniform)
-    if ((points_list = (long *) calloc(1, (long)pow(A, N) * sizeof(long))) == NULL) {
-      printf("Unable to allocate sufficient memory for points_list.\nAborting.\n");
-      exit(-1);
-    }
+	/* Allocate storage for list of indexes of points in the landscape - for new_random_point() */
+	if (agent_distribution == uniform)
+		if ((points_list = (long *) calloc(1, (long)pow(A, N) * sizeof(long))) == NULL) {
+			printf("Unable to allocate sufficient memory for points_list.\nAborting.\n");
+			exit(-1);
+		}
 
-  /* Allocate storage for the average fitness/generation */
-  if ((avg_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-    printf("Unable to allocate sufficient memory for avg_fit.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the average fitness/generation */
+	if ((avg_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+		printf("Unable to allocate sufficient memory for avg_fit.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for the maximum fitness/generation */
-  if ((max_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-    printf("Unable to allocate sufficient memory for max_fit.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the maximum fitness/generation */
+	if ((max_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+		printf("Unable to allocate sufficient memory for max_fit.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for the true average fitness/generation */
-  if ((tr_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-    printf("Unable to allocate sufficient memory for tr_fit.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the true average fitness/generation */
+	if ((tr_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+		printf("Unable to allocate sufficient memory for tr_fit.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for the cumulative average fitness/generation */
-  if ((cum_avg_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-    printf("Unable to allocate sufficient memory for cum_avg_fit.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the cumulative average fitness/generation */
+	if ((cum_avg_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+		printf("Unable to allocate sufficient memory for cum_avg_fit.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for the cumulative maximum fitness/generation */
-  if ((cum_max_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-    printf("Unable to allocate sufficient memory for cum_max_fit.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the cumulative maximum fitness/generation */
+	if ((cum_max_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+		printf("Unable to allocate sufficient memory for cum_max_fit.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Allocate storage for the cumulative true fitness/generation */
-  if ((cum_tr_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-    printf("Unable to allocate sufficient memory for cum_tr_fit.\nAborting.\n");
-    exit(-1);
-  }
+	/* Allocate storage for the cumulative true fitness/generation */
+	if ((cum_tr_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+		printf("Unable to allocate sufficient memory for cum_tr_fit.\nAborting.\n");
+		exit(-1);
+	}
 
-  if (num_agents==1) {
-    if ((dif_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
-      printf("Unable to allocate sufficient memory for dif_fit.\nAborting.\n");
-      exit(-1);
-    }
-  }
+	if (num_agents==1) {
+		if ((dif_fit = (double *) calloc(1, (1+max_walk_length) * sizeof(double))) == NULL) {
+			printf("Unable to allocate sufficient memory for dif_fit.\nAborting.\n");
+			exit(-1);
+		}
+	}
 
-  if (store_agents) {    
-    /* Construct agents data filename and open its file */
-    strcpy(filename, out_filename);
-    strcat(filename, ".agents");
-    if ((agentsfp = fopen(filename, "w")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", filename);
-      exit (-3);
-    }
-    /* Write header information in agents file for xv to read */
-    fprintf(agentsfp, "P1\n%d %d\n", N, max_walk_length);
-  }
+	if (store_agents) {
+		/* Construct agents data filename and open its file */
+		strcpy(filename, out_filename);
+		strcat(filename, ".agents");
+		if ((agentsfp = fopen(filename, "w")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", filename);
+			exit (-3);
+		}
+		/* Write header information in agents file for xv to read */
+		fprintf(agentsfp, "P1\n%d %d\n", N, max_walk_length);
+	}
 
-  if (store_hamming) {
-    /* Construct hamming distances data filename and open its file */
-    strcpy(filename, out_filename);
-    strcat(filename, ".peaks");
-    if ((hammingfp = fopen(filename, "w")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", filename);
-      exit (-3);
-    }
-  }
+	if (store_hamming) {
+		/* Construct hamming distances data filename and open its file */
+		strcpy(filename, out_filename);
+		strcat(filename, ".peaks");
+		if ((hammingfp = fopen(filename, "w")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", filename);
+			exit (-3);
+		}
+	}
 
-  num_poles = (int)ceil((float)(max_walk_length+1)/pole_dist);      /* Add one for the initial state */
-  if (store_flags) {
-    /* Allocate storage for the flagpoles */
-    if ((flagpoles = (LOCUS_TYPE *) calloc(1, num_poles*num_agents*N*sizeof(LOCUS_TYPE))) == NULL) {
-      printf("Unable to allocate sufficient memory for initial_agents.\nAborting.\n");
-      exit(-1);
-    }
+	num_poles = (int)ceil((float)(max_walk_length+1)/pole_dist);      /* Add one for the initial state */
+	if (store_flags) {
+		/* Allocate storage for the flagpoles */
+		if ((flagpoles = (LOCUS_TYPE *) calloc(1, num_poles*num_agents*N*sizeof(LOCUS_TYPE))) == NULL) {
+			printf("Unable to allocate sufficient memory for initial_agents.\nAborting.\n");
+			exit(-1);
+		}
 
-    /* Construct pole output filename and open pole output file */
-    strcpy(filename, out_filename);
-    strcat(filename, ".pole");
-    if ((polefp = fopen(filename, "w")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", filename);
-      exit (-3);
-    }
+		/* Construct pole output filename and open pole output file */
+		strcpy(filename, out_filename);
+		strcat(filename, ".pole");
+		if ((polefp = fopen(filename, "w")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", filename);
+			exit (-3);
+		}
 
-    /* Write pre-walk data into pole output file */
-    fprintf(polefp, "%d %d %d %d ", num_poles, pole_dist, num_agents, num_repeat_walk);
-    fprintf(polefp, "%d %d %d %d %d %d %f %f\n",
-	    N, K, A, max_walk_length, max_neigh_dist, seed, noise_var, noise_gain);
-    fprintf(polefp, "%15s\n", epi_locs);
-    fprintf(polefp, "%15s\n", noise_density);
-    fprintf(polefp, "%15s\n", adaptive_walk);
-  }
+		/* Write pre-walk data into pole output file */
+		/* SS reformatted the output form of the variables */
+		fprintf(polefp, "num_poles= %d    ", num_poles);
+		fprintf(polefp, "pole_dist= %d\n", pole_dist);
+		fprintf(polefp, "num_agents= %d    ", num_agents);
+		fprintf(polefp, "num_repeat_walk= %d\n", num_repeat_walk);
+		fprintf(polefp, "N= %17d    ", N);
+		fprintf(polefp, "K= %d\n", K);
+		fprintf(polefp, "A= %17d    ", A);
+		fprintf(polefp, "max_walk_length= %d\n", max_walk_length);
+		fprintf(polefp, "max_neigh_dist= %d ", max_neigh_dist);
+		fprintf(polefp, "seed= %d\n", seed);
+		fprintf(polefp, "noise_var= %f ", noise_var);
+		fprintf(polefp, "noise_gain= %f\n", noise_gain);
+		//fprintf(polefp, "%d %d %d %d ", num_poles, pole_dist, num_agents, num_repeat_walk);
+		//fprintf(polefp, "%d %d %d %d %d %d %f %f\n",
+		//		N, K, A, max_walk_length, max_neigh_dist, seed, noise_var, noise_gain);
+		fprintf(polefp, "epi_locs: %s\n", epi_locs);
+		fprintf(polefp, "noise_density: %s\n", noise_density);
+		fprintf(polefp, "adaptive walk type: %s\n", adaptive_walk);
+		fprintf(polefp, "try   agent   flag   distance\n");
+	}
 
-  /* Construct fits output filename and open fits output file */
-  strcpy(filename, out_filename);
-  strcat(filename, ".fits");
-  if ((fitsfp = fopen(filename, "w")) == NULL) {
-    printf("Can not open file %s.\nAborting.\n", filename);
-    exit (-3);
-  }
-  
-  hist_number = 0;
-  
-  if (store_landhisto) {
+	/* Construct fits output filename and open fits output file */
+	strcpy(filename, out_filename);
+	strcat(filename, ".fits");
+	if ((fitsfp = fopen(filename, "w")) == NULL) {
+		printf("Can not open file %s.\nAborting.\n", filename);
+		exit (-3);
+	}
 
-    /* Construct landhisto data filename and open its file */
-    strcpy(filename, out_filename);
-    strcat(filename, ".land");
-    if ((landfp = fopen(filename, "w")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", filename);
-      exit (-3);
-    }
-	
-    /* Open file */
-    if ((landfp = fopen(filename, "w")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", filename);
-      exit (-3);
-    }
-  }
+	hist_number = 0;
 #if 0
-  if (store_histo) {
-    strcpy(histofilename, out_filename);
-    strcat(histofilename, ".hist");
+	if (store_histo) {
+		strcpy(histofilename, out_filename);
+		strcat(histofilename, ".hist");
 
-    /* Write header to file, then close it - since I append to it in the algorithm below */
-      if ((histofp = fopen(histofilename, "w")) == NULL) {
-	printf("Can not open file %s.\nAborting.\n", histofilename);
-	exit (-3);
-      }
-    fprintf(histofp,
-	    "@ subtitle \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%.3g g=%.3g b=%d\"\n",
-	    N, K, A, max_walk_length, max_neigh_dist, seed, epi_locs[0], noise_density[0],
-	    adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var,
-	    noise_gain, num_bins);
-    fclose(histofp);
-  }
+		/* Write header to file, then close it - since I append to it in the algorithm below */
+		if ((histofp = fopen(histofilename, "w")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", histofilename);
+			exit (-3);
+		}
+		fprintf(histofp,
+				"@ subtitle \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%.3g g=%.3g b=%d\"\n",
+				N, K, A, max_walk_length, max_neigh_dist, seed, epi_locs[0], noise_density[0],
+				adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var,
+				noise_gain, num_bins);
+		fclose(histofp);
+	}
 #endif
 }
 
 void print_usage(void)
 /* Display summary of command line options */
 {
-    printf("usage:  nk -option [value]\n");
-    printf("    -A A        Number of alleles (default 2)\n");
-    printf("    -a a        Number of adaptive agents (default 1)\n");
-    printf("    -b b        Number of fitness bins (default 30)\n");
-    printf("    -c s        Compute optional outputs (default is only cumulative fitnesses)\n");
-    printf("                   s=[a][d][f][H][h][p] for\n");
-    printf("                     [a] - agent genotypes\n");
-    printf("                     [d] - histogram of all fitness values in the landscape\n");
-    printf("                     [f] - interim fitnesses\n");
-    printf("                     [H] - Hamming distances to all peaks in the landscape\n");
-    printf("                     [h] - fitness histograms at <-f f> intervals\n");
-    printf("                     [p] - flagpole data\n");
-    printf("    -D          include debugging code\n");
-    printf("    -d s        Agent distribution type\n");
-    printf("                   s={(identical), random, adjacent, skewed, uniform}\n");
-    printf("    -e e        Number of steps for adaptive walk\n");
-    printf("                   e=0 for following a rule embedded in the code\n");
-    printf("    -f f        Number generations between fitness histograms (default 10)\n");
-    printf("    -g g        Gain for noise dependence on fitness\n");
-    printf("    -h          This message\n");
-    printf("    -K K        Number of epistatic interactions (default 0)\n");
-    printf("    -L s        Locations of epistatic interactions\n");
-    printf("                   s={(adjacent), random}\n");
-    printf("    -m m        Maximum mutant search distance (default 1)\n");
-    printf("    -n s        Noise distribution type\n");
-    printf("                   s={(none), gaussian, uniform}\n");
-    printf("    -N N        Size of genotype (default 6)\n");
-    printf("    -o <name>   Output to file <name> (default file is nkdat)\n");
-    printf("    -p p        Distance between 'flagpoles' (default 25)\n");
-    printf("    -R R        Number of walks to run each with a different seed (default 1)\n");
-    printf("    -r r        Number times to repeat fitness calculation (default 1)\n");
-    printf("    -s s        Seed for random number generator (<0 to use clock for seed)\n");
-    printf("    -v v        Variance of noise (default 0.001)\n");
-    printf("    -W s        Type of adaptive walk\n");
-    printf("                   s={fitter(not implemented), greedy, (random), Weinberg}\n");
-    printf("    -w s        Probability density for epistatic weights\n");
-    printf("                   s={(uniform)}\n");
-    exit (2);
+	printf("usage:  nk -option [value]\n");
+	printf("    -A A        Number of alleles (default 2)\n");
+	printf("    -a a        Number of adaptive agents (default 1)\n");
+	printf("    -b b        Number of fitness bins (default 30)\n");
+	printf("    -c s        Compute optional outputs (default is only cumulative fitnesses)\n");
+	printf("                   s=[a][d][f][H][h][p] for\n");
+	printf("                     [a] - agent genotypes\n");
+	printf("                     [d] - histogram of all fitness values in the landscape\n");
+	printf("                     [f] - interim fitnesses\n");
+	printf("                     [H] - Hamming distances to all peaks in the landscape\n");
+	printf("                     [h] - fitness histograms at <-f f> intervals\n");
+	printf("                     [p] - flagpole data\n");
+	printf("    -D          include debugging code\n");
+	printf("    -d s        Agent distribution type\n");
+	printf("                   s={(identical), random, adjacent, skewed, uniform}\n");
+	printf("    -e e        Number of steps for adaptive walk\n");
+	printf("                   e=0 for following a rule embedded in the code\n");
+	printf("    -f f        Number generations between fitness histograms (default 10)\n");
+	printf("    -g g        Gain for noise dependence on fitness\n");
+	printf("    -h          Print this message\n");
+	printf("    -i <name>   Read options from file <name>\n");
+	printf("    -K K        Number of epistatic interactions (default 0)\n");
+	printf("    -L s        Locations of epistatic interactions\n");
+	printf("                   s={(adjacent), random}\n");
+	printf("    -m m        Maximum mutant search distance (default 1)\n");
+	printf("    -n s        Noise distribution type\n");
+	printf("                   s={(none), gaussian, uniform}\n");
+	printf("    -N N        Size of genotype (default 6)\n");
+	printf("    -o <name>   Output to file <name> (default file is nkdat)\n");
+	printf("    -p p        Distance between 'flagpoles' (default 25)\n");
+	printf("    -R R        Number of walks to run each with a different seed (default 1)\n");
+	printf("    -r r        Number times to repeat fitness calculation (default 1)\n");
+	printf("    -s s        Seed for random number generator (<0 to use clock for seed)\n");
+	printf("    -v v        Variance of noise (default 0.001)\n");
+	printf("    -W s        Type of adaptive walk\n");
+	printf("                   s={fitter(not implemented), greedy, (random), Weinberg}\n");
+	printf("    -w s        Probability density for epistatic weights\n");
+	printf("                   s={(uniform)}\n");
+	exit (2);
 }
 
 void init_agents(LOCUS_TYPE *agents[])
@@ -540,176 +832,184 @@ void init_agents(LOCUS_TYPE *agents[])
    Must have kseed, nseed and eloc defined first - so can use calc_fit() when
    setting up a uniform distribution of agents */
 {
-  int i, j, bin, present_agent;
-  LOCUS_TYPE *agent;
-  int *num_points_in_bin;
-  long *indexes_in_bin, *num_points_in_landscape;
-  long ii, index;
+	int i, j, bin, present_agent;
+	LOCUS_TYPE *agent;
+	int *num_points_in_bin;
+	long *indexes_in_bin, *num_points_in_landscape;
+	long ii, index;
 
-  /* Initialize the agents */
-  switch (agent_distribution) {
-    case identical:
-      for (i=0; i<N; i++)
-	agents[0][i] = uniform(A);
-      for (i=1; i<num_agents; i++)
-	memcpy(agents[i], agents[0], N);
-      break;
-    case random:
-      for (i=0; i<num_agents; i++)
-	for (j=0; j<N; j++)
-	  agents[i][j] = uniform(A);
-      break;
-    case adjacent:
-      printf("Unwritten agent_distribution, \"%d\".\nAborting.\n", agent_distribution);
-      exit(-1);
-      break;
-    case skewed:
-      printf("Unwritten agent_distribution, \"%d\".\nAborting.\n", agent_distribution);
-      exit(-1);
-      break;
-    case uniform:
-      printf("Requested num_agents=%d, num_bins=%d, num_points_per_bin=%d\n", num_agents, num_bins,
-	     num_points_per_bin);
-    
-      /* Allocate the temporary agent */
-      if ((agent = (LOCUS_TYPE *) calloc(1, N * sizeof(LOCUS_TYPE))) == NULL) {
-	printf("Unable to allocate sufficient memory for agent.\nAborting.\n");
-	exit(-1);
-      }
+	/* Initialize the agents */
+	switch (agent_distribution) {
+	case identical:
+		for (i=0; i<N; i++){
+			agents[0][i] = uniform(A);
+		}
+		for (i=1; i<num_agents; i++)
+			memcpy(agents[i], agents[0], N);
+		break;
+	case random:
+		for (i=0; i<num_agents; i++)
+			for (j=0; j<N; j++)
+				agents[i][j] = uniform(A);
+		break;
+	case adjacent:
+		printf("Unwritten agent_distribution, \"%d\".\nAborting.\n", agent_distribution);
+		exit(-1);
+		break;
+	case skewed:
+		printf("Unwritten agent_distribution, \"%d\".\nAborting.\n", agent_distribution);
+		exit(-1);
+		break;
+	case uniform:
+		printf("Requested num_agents=%d, num_bins=%d, num_points_per_bin=%d\n", num_agents, num_bins,
+				num_points_per_bin);
+		fflush(stdout);
+		/* Allocate the temporary agent */
+		if ((agent = (LOCUS_TYPE *) calloc(1, N * sizeof(LOCUS_TYPE))) == NULL) {
+			printf("Unable to allocate sufficient memory for agent.\nAborting.\n");
+			exit(-1);
+		}
 
-      /* Allocate the number point in bin array */
-      if ((num_points_in_bin = (int *) calloc(1, num_bins * sizeof(int))) == NULL) {
-	printf("Unable to allocate sufficient memory for num_points_in_bin.\nAborting.\n");
-	exit(-1);
-      }
+		/* Allocate the number point in bin array */
+		if ((num_points_in_bin = (int *) calloc(1, num_bins * sizeof(int))) == NULL) {
+			printf("Unable to allocate sufficient memory for num_points_in_bin.\nAborting.\n");
+			exit(-1);
+		}
 
-      /* Allocate the number points in bin for entire landscape array */
-      if ((num_points_in_landscape = (long *) calloc(1, num_bins * sizeof(long))) == NULL) {
-	printf("Unable to allocate sufficient memory for num_points_in_landscape.\nAborting.\n");
-	exit(-1);
-      }
+		/* Allocate the number points in bin for entire landscape array */
+		if ((num_points_in_landscape = (long *) calloc(1, num_bins * sizeof(long))) == NULL) {
+			printf("Unable to allocate sufficient memory for num_points_in_landscape.\nAborting.\n");
+			exit(-1);
+		}
 
-      /* Allocate the list of indexes in each bin array */
-      if ((indexes_in_bin = (long *) calloc(1, num_bins * num_points_per_bin *
-					    sizeof(long))) == NULL) {
-	printf("Unable to allocate sufficient memory for indexes_in_bin.\nAborting.\n");
-	exit(-1);
-      }
+		/* Allocate the list of indexes in each bin array */
+		if ((indexes_in_bin = (long *) calloc(1, num_bins * num_points_per_bin *
+				sizeof(long))) == NULL) {
+			printf("Unable to allocate sufficient memory for indexes_in_bin.\nAborting.\n");
+			exit(-1);
+		}
 
-      /* Initialize the points_list array */
-      for (ii=0; ii<(long)pow(A, N); ii++)
-	points_list[ii] = ii;
+		/* Initialize the points_list array */
+		for (ii=0; ii<(long)pow(A, N); ii++)
+			points_list[ii] = ii;
 
-      /* Reset number of unchosen points in the landscape */
-      points_left = (long)pow(A, N);
+		/* Reset number of unchosen points in the landscape */
+		points_left = (long)pow(A, N);
 
-      /* The first agent to allocate is agents[0] */
-      present_agent = 0;
+		/* The first agent to allocate is agents[0] */
+		present_agent = 0;
 
-      /* While points in space remain.  Perhaps I should ignore the lower few and
+		/* While points in space remain.  Perhaps I should ignore the lower few and
 	 upper few bins - then I could stop when the remaining bins are filled.
 	 Also, look to see if I should use another seed for this process */
 
-      while (points_left) {
-	/* Pick a remaining point at random */
-	index = new_random_point(agent);
+		while (points_left) {
+			/* Pick a remaining point at random */
+			index = new_random_point(agent);
 
-	/* Find the point's bin */
-	bin = (int)floor(calc_fit(agent)*num_bins);
+			/* Find the point's bin */
+			bin = (int)floor(calc_fit(agent)*num_bins);
 
-	/* Update the bin information */
-	num_points_in_landscape[bin]++;
+			/* Update the bin information */
+			num_points_in_landscape[bin]++;
 
-	/* If the bin is not full */
-	if (num_points_in_bin[bin]<num_points_per_bin) {
+			/* If the bin is not full */
+			if (num_points_in_bin[bin]<num_points_per_bin) {
 
-	  /* Use this point as an agent */
-	  memcpy(agents[present_agent++], agent, N);
+				/* Use this point as an agent */
+				memcpy(agents[present_agent++], agent, N);
 
-	  /* Update the bin information */
-	  indexes_in_bin[bin*num_points_per_bin + num_points_in_bin[bin]] = index;
-	  num_points_in_bin[bin]++;
+				/* Update the bin information */
+				indexes_in_bin[bin*num_points_per_bin + num_points_in_bin[bin]] = index;
+				num_points_in_bin[bin]++;
+			}
+		}
+
+		if (store_landhisto) {
+			char filename[100];
+			/* Construct landhisto data filename and open its file */
+			strcpy(filename, out_filename);
+			strcat(filename, ".land");
+			if ((landfp = fopen(filename, "w")) == NULL) {
+				printf("Can not open file %s.\nAborting.\n", filename);
+				exit (-3);
+			}
+			/* Write header to file */
+			fprintf(landfp,
+					"@ subtitle \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%.3g g=%.3g b=%d\"\n",
+					N, K, A, max_walk_length, max_neigh_dist, seed, epi_locs[0], noise_density[0],
+					adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var,
+					noise_gain, num_bins);
+
+			/* Save all fitness values in the landscape, binned as requested with the -b option */
+			for (bin=0; bin<num_bins; bin++)
+				fprintf(landfp, "%f %ld\n", (bin+0.5)/num_bins, num_points_in_landscape[bin]);
+
+			fclose(landfp);
+		}
+
+		/* Fill in the partially-filled bins with copies of the points already in them */
+		for (bin=0; bin<num_bins; bin++) {
+			/* printf("bin %d: %d members\n", bin, num_points_in_bin[bin]); */
+			if ((num_points_in_bin[bin]<num_points_per_bin) && (num_points_in_bin[bin]!=0)) {
+				for (i=0; i<num_points_per_bin - num_points_in_bin[bin]; i++) {
+					index_to_agent(agent, indexes_in_bin[bin*num_points_per_bin +
+														 (i % num_points_in_bin[bin])]);
+					memcpy(agents[present_agent++], agent, N);
+				}
+			}
+		}
+
+		/* Reset num_agents to reflect the number of fitness bins in which there are agents */
+		num_agents = present_agent;
+		printf("Finished uniform allocation, reset number of agents to %d.\n", num_agents);
+
+		for (bin=0; bin<num_bins; bin++)
+			num_points_in_bin[bin]=0;
+
+		for (i=0; i<num_agents; i++) {
+			bin = (int)floor(calc_fit(agents[i])*num_bins);
+			num_points_in_bin[bin]++;
+		}
+
+		/* Free the memory allocated to set up the uniform distribution */
+		free(num_points_in_bin);
+		free(indexes_in_bin);
+		free(agent);
+
+		break;
+	default:
+		printf("Undefined agent_distribution, \"%d\".\nAborting.\n", agent_distribution);
+		exit(-1);
+		break;
 	}
-      }
-
-      if (store_landhisto) {
-
-	/* Write header to file */
-	fprintf(landfp,
-		"@ subtitle \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%.3g g=%.3g b=%d\"\n",
-		N, K, A, max_walk_length, max_neigh_dist, seed, epi_locs[0], noise_density[0],
-		adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var,
-		noise_gain, num_bins);
-	
-	/* Save all fitness values in the landscape, binned as requested with the -b option */
-	for (bin=0; bin<num_bins; bin++)
-	  fprintf(landfp, "%f %ld\n", (bin+0.5)/num_bins, num_points_in_landscape[bin]);
-
-	fclose(landfp);
-      }
-	
-	/* Fill in the partially-filled bins with copies of the points already in them */
-	for (bin=0; bin<num_bins; bin++) {
-	  /* printf("bin %d: %d members\n", bin, num_points_in_bin[bin]); */
-	  if ((num_points_in_bin[bin]<num_points_per_bin) && (num_points_in_bin[bin]!=0)) {
-	    for (i=0; i<num_points_per_bin - num_points_in_bin[bin]; i++) {
-	    index_to_agent(agent, indexes_in_bin[bin*num_points_per_bin +
-						 (i % num_points_in_bin[bin])]);
-	    memcpy(agents[present_agent++], agent, N);
-	  }
-	}
-      }
-
-      /* Reset num_agents to reflect the number of fitness bins in which there are agents */
-      num_agents = present_agent;
-      printf("Finished uniform allocation, reset number of agents to %d.\n", num_agents);
-
-      for (bin=0; bin<num_bins; bin++)
-	num_points_in_bin[bin]=0;
-
-      for (i=0; i<num_agents; i++) {
-	bin = (int)floor(calc_fit(agents[i])*num_bins);
-	num_points_in_bin[bin]++;
-      }
-
-      /* Free the memory allocated to set up the uniform distribution */
-      free(num_points_in_bin);
-      free(indexes_in_bin);
-      free(agent);
-
-      break;
-    default:
-      printf("Undefined agent_distribution, \"%d\".\nAborting.\n", agent_distribution);
-      exit(-1);
-      break;
-    }
 }
 
 void print_agent(LOCUS_TYPE *agent, int agent_number)
 /* Display the genes of an agent */
 {
-  int i;
+	int i;
 
-  printf("guy[%2d] : ", agent_number);
-  for (i=0; i<N; i++)
-    printf("%d", agent[i]);
+	printf("guy[%2d] : ", agent_number);
+	for (i=0; i<N; i++)
+		printf("%d ", agent[i]);
 }
 
 void set_epi_locs(short *eloc)
 /* Set the locations of the K epistatic dependencies for each of the N genes */
 {
-  int i, j, k, pick_loc;
-  short *remaining_locs;
-  short *sptr, *head;
+	int i, j, k, pick_loc;
+	short *remaining_locs;
+	short *sptr, *head;
 
-  if ((remaining_locs = (short *) malloc(N * sizeof(short))) == NULL) {
-    printf("Unable to allocate sufficient memory for remaining_locs.\nAborting.\n");
-    exit(-1);
-  }
+	if ((remaining_locs = (short *) malloc(N * sizeof(short))) == NULL) {
+		printf("Unable to allocate sufficient memory for remaining_locs.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Initialize the epistatic dependency locations array */
+	/* Initialize the epistatic dependency locations array */
 
-     /* The line *(sptr++) = (i+j-(int)(K/2)+N) % N assigns to the short
+	/* The line *(sptr++) = (i+j-(int)(K/2)+N) % N assigns to the short
      integer currently pointed to by sptr the location of the jth epistatic
      dependency for gene i.  The locations are centered about the ith gene
      with K/2 locations to the left and K/2 to the right, the dependency on
@@ -720,98 +1020,98 @@ void set_epi_locs(short *eloc)
      i+j-(int)(K/2) will never be less than -N.  After the assignment, sptr
      is incremented to point to the next short. */
 
-  head = eloc;
-  sptr = head;
-  if (epi_locs[0]=='a')
-    /* adjacent epistatic dependency locations */
-    for (i=0; i<N; i++) {
-      for (j=0; j<(int)(K/2); j++) {      /* locations to left of gene i */
-      	*(sptr++) = (i+j-(int)(K/2)+N) % N;
-      }
-      for (j=(int)(K/2)+1; j<=K; j++) {   /* locations to right of gene i */
-        *(sptr++) = (i+j-(int)(K/2)+N) % N;
-      }
-    }
-  else
-    /* random epistatic dependency locations */
-    for (i=0; i<N; i++) {
-      /* set up list of candidate locations */
-      for (j=0; j<N-1;j++)
-	      remaining_locs[j]=j;
-      /* Stuff location N-1 in location i (location i is not a candidate) */
-      if (i!=(N-1))
-	      remaining_locs[i]=N-1;
-      for (k=0; k<K; k++) {
-	/* Randomly select a location from that list */
-	if (N-2-k)
-	  pick_loc = (short)uniform(N-1-k);
+	head = eloc;
+	sptr = head;
+	if (epi_locs[0]=='a')
+		/* adjacent epistatic dependency locations */
+		for (i=0; i<N; i++) {
+			for (j=0; j<(int)(K/2); j++) {      /* locations to left of gene i */
+				*(sptr++) = (i+j-(int)(K/2)+N) % N;
+			}
+			for (j=(int)(K/2)+1; j<=K; j++) {   /* locations to right of gene i */
+				*(sptr++) = (i+j-(int)(K/2)+N) % N;
+			}
+		}
 	else
-	  pick_loc = 0;
-	*(sptr++) = remaining_locs[pick_loc];	/* Remove that location from the list */
-	remaining_locs[pick_loc] = remaining_locs[N-2-k];
-      }
-    }
-  
-  if (0) {
-    printf("Elocs: ");
-    if (K==0)
-      printf("<K=0, no elocs values>");
-    for (i=0; i<N; i++)
-      for (j=0; j<K; j++)
-	printf("%d ", *(head + i*K+j));
-    printf("\n");
-  }
-  free(remaining_locs);
+		/* random epistatic dependency locations */
+		for (i=0; i<N; i++) {
+			/* set up list of candidate locations */
+			for (j=0; j<N-1;j++)
+				remaining_locs[j]=j;
+			/* Stuff location N-1 in location i (location i is not a candidate) */
+			if (i!=(N-1))
+				remaining_locs[i]=N-1;
+			for (k=0; k<K; k++) {
+				/* Randomly select a location from that list */
+				if (N-2-k)
+					pick_loc = (short)uniform(N-1-k);
+				else
+					pick_loc = 0;
+				*(sptr++) = remaining_locs[pick_loc];	/* Remove that location from the list */
+				remaining_locs[pick_loc] = remaining_locs[N-2-k];
+			}
+		}
+
+	if (0) {
+		printf("Elocs: ");
+		if (K==0)
+			printf("<K=0, no elocs values>");
+		for (i=0; i<N; i++)
+			for (j=0; j<K; j++)
+				printf("%d ", *(head + i*K+j));
+		printf("\n");
+	}
+	free(remaining_locs);
 }
 
 void set_seeds(void)
 /* Set random values in the arrays nseed[] kseed[].  These arrays are used to calc fitnesses */
 {
-  int i;
+	int i;
 
-  for (i=0; i<N; i++) {
-    nseed[i]=luniform(MAX_LONG);
-    kseed[i]=luniform(MAX_LONG);
-  }
+	for (i=0; i<N; i++) {
+		nseed[i]=luniform(MAX_LONG);
+		kseed[i]=luniform(MAX_LONG);
+	}
 }
 
 double calc_fit(LOCUS_TYPE *agent)
 /* Calculates and returns fitness of an agent */
 /* Needs globals of nseed[], kseed[], elocs[], N, K */
 {
-  long seed;
-  int i, j;
-  double fitness;
+	long seed;
+	int i, j;
+	double fitness;
 
-  put_random_state();                        /* Store present state of random number generator */
-  fitness = 0.0;
+	put_random_state();                        /* Store present state of random number generator */
+	fitness = 0.0;
 
-  /* Calculate and sum the fitness contributions from the N genes */
-  for (i=0; i<N; i++) {
-    seed = *(nseed+i);
-    for (j=0; j<K; j++)                                 /* Do K other locations for this locus */
-      seed ^= agent[*(eloc + i*K + j)] * kseed[*(eloc + i*K + j)];
-    seed ^= agent[i] * kseed[i];                                              /* Do location i */
-    seed_random(abs(seed));
-    fitness += knuth_random();
-  }
-  fitness /= N;
+	/* Calculate and sum the fitness contributions from the N genes */
+	for (i=0; i<N; i++) {
+		seed = *(nseed+i);
+		for (j=0; j<K; j++)                                 /* Do K other locations for this locus */
+			seed ^= agent[*(eloc + i*K + j)] * kseed[*(eloc + i*K + j)];
+		seed ^= agent[i] * kseed[i];                                              /* Do location i */
+		seed_random(abs(seed));
+		fitness += knuth_random();
+	}
+	fitness /= N;
 
-  get_random_state();                              /* Restore state of random number generator */
-  return (fitness);
+	get_random_state();                              /* Restore state of random number generator */
+	return (fitness);
 }
 
 double noise(double fitness)
 /* Generates noise term for fitness as appropriate */
 {
-  if (noise_density[0]=='g') {
-     /* Gaussian noise of 0 mean */
-    return(gasdev((double)stand_dev * exp((double)noise_gain * (0.5 - fitness))));
-  }
-  else if (noise_density[0]=='u')
-    return(2*noise_gain*noise_var*(knuth_random() - 0.5));          /* Uniform noise of 0 mean */
-  else
-    return (0);
+	if (noise_density[0]=='g') {
+		/* Gaussian noise of 0 mean */
+		return(gasdev((double)stand_dev * exp((double)noise_gain * (0.5 - fitness))));
+	}
+	else if (noise_density[0]=='u')
+		return(2*noise_gain*noise_var*(knuth_random() - 0.5));          /* Uniform noise of 0 mean */
+	else
+		return (0);
 }
 
 void walk_agents(LOCUS_TYPE *agents[])
@@ -825,276 +1125,282 @@ void walk_agents(LOCUS_TYPE *agents[])
    num_agents		number of agents simultaneously adapting
    max_walk_length	maximum number of steps for adaptive walk
    adaptive_walk	type of adaptive walk
-*/
+ */
 {
-  int i, j;
-  char walking = 1;				     /* Toggle to continue the walk */
-  int try = 0;					     /* Number steps so far in walk */
-  int *accepted_steps;	    /* Number accepted steps for each agent */
-  LOCUS_TYPE *new_guy;				  /* New mutant to consider */
-  double nfit, tfit;		          /* Noisy and true fitnesses of new mutant */
-  
-  if ((accepted_steps = (int *) malloc(num_agents * sizeof(int))) == NULL) {
-    printf("Unable to allocate sufficient memory for accepted_steps.\nAborting.\n");
-    exit(-1);
-  }
-  if ((new_guy = (LOCUS_TYPE *) malloc(N * sizeof(LOCUS_TYPE))) == NULL) {
-    printf("Unable to allocate sufficient memory for new_guy.\nAborting.\n");
-    exit(-1);
-  }
+	int i, j;
+	char walking = 1;				     /* Toggle to continue the walk */
+	int try = 0;					     /* Number steps so far in walk */
+	int *accepted_steps;	    /* Number accepted steps for each agent */
+	LOCUS_TYPE *new_guy;				  /* New mutant to consider */
+	double nfit, tfit;		          /* Noisy and true fitnesses of new mutant */
 
-  for (i=0; i<num_agents; i++) {
-    accepted_steps[i]=0;
-    true_fitness[i]=calc_fit(agents[i]);
-    noisy_fitness[i]=true_fitness[i] + noise(true_fitness[i]);
-  }
-  flag_number = 0;
-  collect_stats(try, agents);
-  printf("try: ");
-  if (max_walk_length==0) {
-    walking=0;
-    printf("0");
-  }
-
-  switch(adaptive_walk[0]) {
-    case 'r':
-      /* random - accept any fitter mutant, waste a try if mutant is not more fit */
-      while (walking) {
-	try++;
-	if (!(try % SHOW_TRY_FREQ)) {
-	  printf("%d ", try);
-	  fflush(stdout);
+	if ((accepted_steps = (int *) malloc(num_agents * sizeof(int))) == NULL) {
+		printf("Unable to allocate sufficient memory for accepted_steps.\nAborting.\n");
+		exit(-1);
 	}
-	for (i=0;  i<num_agents; i++) {
-
-	  if ((A==2) && (max_neigh_dist==1)) {
-	    /* Initialize new guy to old guy */
-	    memcpy(new_guy, agents[i], N);
-
-	    /* Pick a gene to mutate */
-	    j=uniform(N);
-
-	    /* Mutate the gene */
-	    new_guy[j]=1 - new_guy[j];
-	  }
-	  else
-	    find_any_neighbor(new_guy, agents[i]);
-	  tfit=calc_fit(new_guy);
-	  nfit = tfit + noise(tfit);
-	  if (DEBUG) {
-	    if (try==1)
-	      printf("\n");
-	    print_agent(agents[i], i);
-	    printf("  fit = %f", noisy_fitness[i]);
-	    printf(" (%f)  ", true_fitness[i]);
-	    print_agent(new_guy, 99);
-	    printf("  fit = %f", nfit);
-	    printf(" (%f)", tfit);
-	    printf("  dif = % f\n", nfit - tfit);
-	  }
-	  if (nfit > noisy_fitness[i]) {
-	    memcpy(agents[i], new_guy, N);
-	    noisy_fitness[i]=nfit;
-	    true_fitness[i]=tfit;
-	    accepted_steps[i]++;
-	  }
-	  else
-	    noisy_fitness[i]=true_fitness[i] + noise(true_fitness[i]);/* re-estimate agent's fit */
+	if ((new_guy = (LOCUS_TYPE *) malloc(N * sizeof(LOCUS_TYPE))) == NULL) {
+		printf("Unable to allocate sufficient memory for new_guy.\nAborting.\n");
+		exit(-1);
 	}
-	/*for (i=0; i<num_agents; i++)
+
+	for (i=0; i<num_agents; i++) {
+		accepted_steps[i]=0;
+		true_fitness[i]=calc_fit(agents[i]);
+		noisy_fitness[i]=true_fitness[i] + noise(true_fitness[i]);
+	}
+	flag_number = 0;
+	collect_stats(try, agents);
+	printf("try: ");
+	if (max_walk_length==0) {
+		walking=0;
+		printf("0");
+	}
+
+	switch(adaptive_walk[0]) {
+	case 'r':
+		/* random - accept any fitter mutant, waste a try if mutant is not more fit */
+		while (walking) {
+			try++;
+			if (!(try % SHOW_TRY_FREQ)) {
+				printf("%d ", try);
+				fflush(stdout);
+			}
+			for (i=0;  i<num_agents; i++) {
+
+				if ((A==2) && (max_neigh_dist==1)) {
+					/* Initialize new guy to old guy */
+					memcpy(new_guy, agents[i], N);
+
+					/* Pick a gene to mutate */
+					j=uniform(N);
+
+					/* Mutate the gene */
+					new_guy[j]=1 - new_guy[j];
+				}
+				else
+					find_any_neighbor(new_guy, agents[i]);
+				tfit=calc_fit(new_guy);
+				nfit = tfit + noise(tfit);
+				if (DEBUG) {
+					if (try==1)
+						printf("\n");
+					print_agent(agents[i], i);
+					printf("  fit = %f", noisy_fitness[i]);
+					printf(" (%f)  ", true_fitness[i]);
+					print_agent(new_guy, 99);
+					printf("  fit = %f", nfit);
+					printf(" (%f)", tfit);
+					printf("  dif = % f\n", nfit - tfit);
+				}
+				if (nfit > noisy_fitness[i]) {
+					memcpy(agents[i], new_guy, N);
+					noisy_fitness[i]=nfit;
+					true_fitness[i]=tfit;
+					accepted_steps[i]++;
+				}
+				else
+					noisy_fitness[i]=true_fitness[i] + noise(true_fitness[i]);/* re-estimate agent's fit */
+			}
+			/*for (i=0; i<num_agents; i++)
 	  printf("%f ", tr_fit[i]);
 	printf("\n");*/
-	collect_stats(try, agents);
-	if (try==max_walk_length)	             /* This can be replaced w/ a more efficient */
-	  walking=0;		             /* for loop, but there may be other reasons to stop */
-      }
-      break;
-    case 'g':
-      /* greedy - switch to the most fit mutant, always mutate */
-      while (walking) {
-	try++;
-	if (!(try % SHOW_TRY_FREQ)) {
-	  printf("%d ", try);
-	  fflush(stdout);
-	}
-	for (i=0;  i<num_agents; i++) {
+			collect_stats(try, agents);
+			if (try==max_walk_length)	             /* This can be replaced w/ a more efficient */
+				walking=0;		             /* for loop, but there may be other reasons to stop */
+		}
+		break;
+	case 'g':
+		/* greedy - switch to the most fit mutant, always mutate */
+		while (walking) {
+			try++;
+			if (!(try % SHOW_TRY_FREQ)) {
+				printf("%d ", try);
+				fflush(stdout);
+			}
+			for (i=0;  i<num_agents; i++) {
 
-	  /* Initialize the best fitness found to 0 */
-	  w_best_noisy_fit=0;                               /* REVERSE (SET TO 1) TO FIND MINIMA */
+				/* Initialize the best fitness found to 0 */
+				w_best_noisy_fit=0;                               /* REVERSE (SET TO 1) TO FIND MINIMA */
 
-	  /* Search through all mutants from *agent within radius max_neigh_dis
+				/* Search through all mutants from *agent within radius max_neigh_dis
 	     Return results in external variables w_best_noisy_fit, w_best_true_fit & w_best_guy */
-	  for (j=1; j<=max_neigh_dist; j++)
-	    loop_all_neigh(agents[i], j, 0);
+				for (j=1; j<=max_neigh_dist; j++)
+					loop_all_neigh(agents[i], j, 0);
 
-	  if (DEBUG) {
-	    print_agent(agents[i], i);
-	    printf("  fit = %f", noisy_fitness[i]);
-	    printf(" (%f)  ", true_fitness[i]);
-	    print_agent(w_best_guy, 99);
-	    printf("  fit = %f", w_best_noisy_fit);
-	    printf(" (%f)", w_best_true_fit);
-	    printf("  dif = %f\n", w_best_noisy_fit - w_best_true_fit);
-	  }
-	  if (w_best_noisy_fit <= noisy_fitness[i]) {        /* REVERSE SIGN FOR DOWNHILL CLIMBS */
-	    /*printf("agent[%d] thinks it's in a local max with fit %f.\n", i, noisy_fitness[i]);*/
-	    noisy_fitness[i]=true_fitness[i]+noise(true_fitness[i]);  /* re-estimate agent's fit */
-	  }
-	  else {
-	    memcpy(agents[i], w_best_guy, N);
-	    noisy_fitness[i]=w_best_noisy_fit;
-	    true_fitness[i]=w_best_true_fit;
-	  }
-	}
-	collect_stats(try, agents);
-	if (try==max_walk_length) 	/* This can be replaced w/ a more efficient */
-	  walking=0;		/* for loop, but there may be other reasons to stop */
-      }
-      break;
-    case 'f':
-      /* fitter - accept any of the more fit mutants, always mutate */
-      printf("Fitter walks are not yet implemented.\nAborting.\n");
-      exit (-4);
-      break;
-    case 'w':
-      /* Weinberg-type walk, accept any mutation regardless of fitness */
-      while (walking) {
-	try++;
-	if (!(try % SHOW_TRY_FREQ)) {
-	  printf("%d ", try);
-	  fflush(stdout);
-	}
-	for (i=0;  i<num_agents; i++) {
-	  /* if (!(i % 10))
+				if (DEBUG) {
+					print_agent(agents[i], i);
+					printf("  fit = %f", noisy_fitness[i]);
+					printf(" (%f)  ", true_fitness[i]);
+					print_agent(w_best_guy, 99);
+					printf("  fit = %f", w_best_noisy_fit);
+					printf(" (%f)", w_best_true_fit);
+					printf("  dif = %f\n", w_best_noisy_fit - w_best_true_fit);
+				}
+				if (w_best_noisy_fit <= noisy_fitness[i]) {        /* REVERSE SIGN FOR DOWNHILL CLIMBS */
+					if(DEBUG) printf("agent[%d] thinks it's in a local max with fit %f.\n", i, noisy_fitness[i]);
+					noisy_fitness[i]=true_fitness[i]+noise(true_fitness[i]);  /* re-estimate agent's fit */
+				}
+				else {
+					memcpy(agents[i], w_best_guy, N);
+					noisy_fitness[i]=w_best_noisy_fit;
+					true_fitness[i]=w_best_true_fit;
+				}
+			}
+			collect_stats(try, agents);
+			if (try==max_walk_length) 	/* This can be replaced w/ a more efficient */
+				walking=0;		/* for loop, but there may be other reasons to stop */
+		}
+		break;
+	case 'f':
+		/* fitter - accept any of the more fit mutants, always mutate */
+		printf("Fitter walks are not yet implemented.\nAborting.\n");
+		exit (-4);
+		break;
+	case 'w':
+		/* Weinberg-type walk, accept any mutation regardless of fitness */
+		while (walking) {
+			try++;
+			if (!(try % SHOW_TRY_FREQ)) {
+				printf("%d ", try);
+				fflush(stdout);
+			}
+			for (i=0;  i<num_agents; i++) {
+				/* if (!(i % 10))
 	    printf("guy %d\n", i); */
-	  find_any_neighbor(new_guy, agents[i]);
-	  tfit = calc_fit(new_guy);
-	  nfit = tfit + noise(tfit);
-	  if (DEBUG) {
-	    print_agent(agents[i], i);
-	    printf("  fit = %f", noisy_fitness[i]);
-	    printf(" (%f)  ", true_fitness[i]);
-	    print_agent(new_guy, 99);
-	    printf("  fit = %f", nfit);
-	    printf(" (%f)\n", tfit);
-	  }
-	  memcpy(agents[i], new_guy, N);
-	  noisy_fitness[i]=nfit;
-	  true_fitness[i]=tfit;
-	  /* accepted_steps[i]++; */
+				find_any_neighbor(new_guy, agents[i]);
+				tfit = calc_fit(new_guy);
+				nfit = tfit + noise(tfit);
+				if (DEBUG) {
+					print_agent(agents[i], i);
+					printf("  fit = %f", noisy_fitness[i]);
+					printf(" (%f)  ", true_fitness[i]);
+					print_agent(new_guy, 99);
+					printf("  fit = %f", nfit);
+					printf(" (%f)\n", tfit);
+				}
+				memcpy(agents[i], new_guy, N);
+				noisy_fitness[i]=nfit;
+				true_fitness[i]=tfit;
+				/* accepted_steps[i]++; */
+			}
+			collect_stats(try, agents);
+			if (try==max_walk_length) 	/* This can be replaced w/ a more efficient */
+				walking=0;		/* for loop, but there may be other reasons to stop */
+		}
+		break;
+	default:
+		printf("Unknown walk type %s\n",adaptive_walk);
+		exit(-1);
+		break;
 	}
-	collect_stats(try, agents);
-	if (try==max_walk_length) 	/* This can be replaced w/ a more efficient */
-	  walking=0;		/* for loop, but there may be other reasons to stop */
-      }
-      break;
-  }
-  printf("\n");
-  /* Display final agents - if asked for */
-  if (DEBUG) {
-    printf("Final Gen %d\n", try);
-    for (i=0;  i<num_agents; i++) {
-      print_agent(agents[i], i);
-      printf("  fit = %f", noisy_fitness[i]);
-      printf(" (%f)\n", true_fitness[i]);
-    }	  
-  }
-  free(accepted_steps);
-  free(new_guy);
+	printf("\n");
+	/* Display final agents - if asked for */
+	if (DEBUG) {
+		printf("Final Gen %d\n", try);
+		for (i=0;  i<num_agents; i++) {
+			print_agent(agents[i], i);
+			printf("  fit = %f", noisy_fitness[i]);
+			printf(" (%f)\n", true_fitness[i]);
+		}
+	}
+	free(accepted_steps);
+	free(new_guy);
 }
 
 void collect_stats(int try, LOCUS_TYPE *agents[])
 /* Collect statistics in each step of the walk */
 {
-  int i, j, dist;
-  double temp1=0, max=0, temp2=0;
-  char dummy[10];
+	int i, j, dist;
+	double temp1=0, max=0, temp2=0;
+	char dummy[10];
 
-  /* Calculate and store avg, max and true fitness for this step of this run */
-  for (i=0; i<num_agents; i++) {
-    temp1+=noisy_fitness[i];
-    temp2+=true_fitness[i];
-    if (noisy_fitness[i]>max)       /* CHANGE SIGN FOR FITNESS MINIMA */
-      max=noisy_fitness[i];
-  }
-  avg_fit[try]=temp1/num_agents;
-  max_fit[try]=max;
-  tr_fit[try]=temp2/num_agents;
+	/* Calculate and store avg, max and true fitness for this step of this run */
+	for (i=0; i<num_agents; i++) {
+		temp1+=noisy_fitness[i];
+		temp2+=true_fitness[i];
+		if (noisy_fitness[i]>max)       /* CHANGE SIGN FOR FITNESS MINIMA */
+			max=noisy_fitness[i];
+	}
+	avg_fit[try]=temp1/num_agents;
+	max_fit[try]=max;
+	tr_fit[try]=temp2/num_agents;
 
-  if (num_agents==1) {
-    /* Collect data on error in fitness */
-    dif_fit[try]=noisy_fitness[0] - tr_fit[try];
-  }
+	if (num_agents==1) {
+		/* Collect data on error in fitness */
+		dif_fit[try]=noisy_fitness[0] - tr_fit[try];
+	}
 
-  if (store_agents) {
-    /* Write agent to file for block output - ADD TO COMMAND LINE LATER */
-    fprintf(agentsfp, "%5d    ", try);
-    for (i=0; i<N; i++)
-      fprintf(agentsfp, "%d ", agents[0][i]);
-    fprintf(agentsfp, "    nf=%7.5f, tf=%7.5f\n", noisy_fitness[0], true_fitness[0]);
-  }
+	if (store_agents) {
+		/* Write agent to file for block output - ADD TO COMMAND LINE LATER */
+		fprintf(agentsfp, "%5d    ", try);
+		for (i=0; i<N; i++)
+			fprintf(agentsfp, "%d ", agents[0][i]);
+		fprintf(agentsfp, "    nf=%7.5f, tf=%7.5f\n", noisy_fitness[0], true_fitness[0]);
+	}
 
-  /* Calculate and store cumulative avg, max and true fitness for this step */
-  cum_avg_fit[try]=(float)( cum_avg_fit[try]*(walk_iteration)+avg_fit[try] ) / (walk_iteration+1);
-  cum_max_fit[try]=(float)( cum_max_fit[try]*(walk_iteration)+max_fit[try] ) / (walk_iteration+1);
-  cum_tr_fit[ try]=(float)( cum_tr_fit[ try]*(walk_iteration)+tr_fit[ try] ) / (walk_iteration+1);
+	/* Calculate and store cumulative avg, max and true fitness for this step */
+	cum_avg_fit[try]=(float)( cum_avg_fit[try]*(walk_iteration)+avg_fit[try] ) / (walk_iteration+1);
+	cum_max_fit[try]=(float)( cum_max_fit[try]*(walk_iteration)+max_fit[try] ) / (walk_iteration+1);
+	cum_tr_fit[ try]=(float)( cum_tr_fit[ try]*(walk_iteration)+tr_fit[ try] ) / (walk_iteration+1);
 
-  if (store_flags) {
-    /* Generate new flagpoles if appropriate */
-    if (!(try % pole_dist))
-      raise_flags(flag_number++, agents);
+	if (store_flags) {
+		/* Generate new flagpoles if appropriate */
+		if (!(try % pole_dist))
+			raise_flags(flag_number++, agents);
 
-    /* Calculate and store distances from all present agents to all past flagpoles */
-    for (i=0; i<num_agents; i++)
-      for (j=0; j<flag_number; j++) {
-	dist = hamming(agents[i], flagpoles + j*num_agents*N + i*N);
-	fprintf(polefp, "%d\n", dist);
-      }
-  }
+		/* Calculate and store distances from all present agents to all past flagpoles */
+		for (i=0; i<num_agents; i++)
+			for (j=0; j<flag_number; j++) {
+				if(DEBUG) print_flags(j);
+				dist = hamming(agents[i], flagpoles + j*num_agents*N + i*N);
+				//fprintf(polefp, "Distance of agent %d from flag %d: %d\n", i, j, dist);
+				fprintf(polefp, "%d   %d   %d   %d\n", try, i, j, dist);
+			}
+	}
 
-  if (store_hamming) {
-    /* Calculate and store Hamming distances from agent to all (or MAX_PEAKS) peaks */
-/*    for (i=0; i<num_peaks; i++)
+	if (store_hamming) {
+		/* Calculate and store Hamming distances from agent to all (or MAX_PEAKS) peaks */
+		/*    for (i=0; i<num_peaks; i++)
       fprintf(hammingfp, "%5d %5d %5d\n", try, i, hamming(agents[0], peaks[i])); */
-/*    fprintf(hammingfp, "%7d ", try);*/
-    for (i=0; i<num_peaks; i++)
-      fprintf(hammingfp, "%5d ", hamming(agents[0], peaks[i]));
-    fprintf(hammingfp, "\n");
-  }
+		/*    fprintf(hammingfp, "%7d ", try);*/
+		for (i=0; i<num_peaks; i++)
+			fprintf(hammingfp, "%5d ", hamming(agents[0], peaks[i]));
+		fprintf(hammingfp, "\n");
+	}
 
-  if ((store_histo) && (!(try % histo_freq))) {
+	if ((store_histo) && (!(try % histo_freq))) {
 
-    /* Generate new filename */
-    strcpy(histofilename, out_filename);
-    sprintf(dummy, ".histe%05d", try);
-/*
+		/* Generate new filename */
+		strcpy(histofilename, out_filename);
+		sprintf(dummy, ".histe%05d", try);
+		/*
     strcat(histofilename, ".hist");
     dummy[0]='A' + hist_number++;
     dummy[1]='\0';
-*/
-    strcat(histofilename, dummy);
+		 */
+		strcat(histofilename, dummy);
 
-    if ((histofp = fopen(histofilename, "a")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", histofilename);
-      exit (-3);
-    }
+		if ((histofp = fopen(histofilename, "a")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", histofilename);
+			exit (-3);
+		}
 
-    /* Write header to file, then close it - since I append to it in the algorithm below */
-    if ((histofp = fopen(histofilename, "w")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", histofilename);
-      exit (-3);
-    }
-    fprintf(histofp,
-	    "@ subtitle \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%.3g g=%.3g b=%d\"\n",
-	    N, K, A, try, max_neigh_dist, seed, epi_locs[0], noise_density[0],
-	    adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var,
-	    noise_gain, num_bins);
+		/* Write header to file, then close it - since I append to it in the algorithm below */
+		if ((histofp = fopen(histofilename, "w")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", histofilename);
+			exit (-3);
+		}
+		fprintf(histofp,
+				"@ subtitle \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%.3g g=%.3g b=%d\"\n",
+				N, K, A, try, max_neigh_dist, seed, epi_locs[0], noise_density[0],
+				adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var,
+				noise_gain, num_bins);
 
-    for (i=0; i<num_agents; i++)
-      fprintf(histofp, "%f\n", true_fitness[i]);
-    fclose(histofp);
-  }
-}    
+		for (i=0; i<num_agents; i++)
+			fprintf(histofp, "%f\n", true_fitness[i]);
+		fclose(histofp);
+	}
+}
 
 void loop_all_neigh(LOCUS_TYPE *agent, int distance, int loop_loc)
 /* Function to recursively loop thru all combinations of <distance> loci of agent and
@@ -1111,302 +1417,302 @@ void loop_all_neigh(LOCUS_TYPE *agent, int distance, int loop_loc)
    w_best_true_fit - true fitness of w_best_guy - external
    w_best_noisy_fit - noisy fitness of w_best_guy - external */
 {
-  int i, j, temp;
-  double tfit, nfit;
+	int i, j, temp;
+	double tfit, nfit;
 
-  if (distance==0) {
+	if (distance==0) {
 
-    /* We have already changed the appropriate number of locations, so
+		/* We have already changed the appropriate number of locations, so
        now *agent is the mutant being considered */
 
-    /* See if this guy has the best fitness so far */
-    tfit = calc_fit(agent);
-    nfit = tfit + noise(tfit);
-    if (nfit>w_best_noisy_fit) {   /* REVERSE SIGN FOR DOWNHILL CLIMB  */
-      memcpy(w_best_guy, agent, N);
-      w_best_true_fit = tfit;
-      w_best_noisy_fit = nfit;
-    }
-    if (0) {
-      printf("neighbor = ");
-      for (i=0; i<N; i++)
-	printf("%3d", agent[i]);
-      printf(", noisy fit = %f\n", nfit);
-    }
-  }
-  else
+		/* See if this guy has the best fitness so far */
+		tfit = calc_fit(agent);
+		nfit = tfit + noise(tfit);
+		if (nfit>w_best_noisy_fit) {   /* REVERSE SIGN FOR DOWNHILL CLIMB  */
+			memcpy(w_best_guy, agent, N);
+			w_best_true_fit = tfit;
+			w_best_noisy_fit = nfit;
+		}
+		if (DEBUG) {
+			printf("neighbor = ");
+			for (i=0; i<N; i++)
+				printf("%3d", agent[i]);
+			printf(", noisy fit = %f\n", nfit);
+		}
+	} else {
 
-    /* We still have distance locations to change */
-    for (i=loop_loc; i<N-distance+1; i++) {
+		/* We still have distance locations to change */
+		for (i=loop_loc; i<N-distance+1; i++) {
 
-      /* Store the initial allele at location i */
-      temp=agent[i];
+			/* Store the initial allele at location i */
+			temp=agent[i];
 
-      /* Try out all alleles for location i that are less than the
+			/* Try out all alleles for location i that are less than the
 	 initial allele */
-      for (j=0; j<temp; j++) {
-	agent[i]=j;
+			for (j=0; j<temp; j++) {
+				agent[i]=j;
 
-	/* Repeat this process for one less mutation on the
+				/* Repeat this process for one less mutation on the
 	   substring at agent[i+1] */
-	loop_all_neigh(agent, distance-1, i+1);
-      }
+				loop_all_neigh(agent, distance-1, i+1);
+			}
 
-      /* Try out all alleles for location i that are greater than
+			/* Try out all alleles for location i that are greater than
 	 the initial allele */
-      for (j=temp+1; j<A; j++) {
-	agent[i]=j;
+			for (j=temp+1; j<A; j++) {
+				agent[i]=j;
 
-	/* Repeat this process for one less mutation on the
+				/* Repeat this process for one less mutation on the
 	   substring at agent[i+1] */
-	loop_all_neigh(agent, distance-1, i+1);
-      }
+				loop_all_neigh(agent, distance-1, i+1);
+			}
 
-      /* Restore the initial allele */
-      agent[i]=temp;
-    }
+			/* Restore the initial allele */
+			agent[i]=temp;
+		}
+	}
 }
 
 void find_any_neighbor(LOCUS_TYPE *new_guy, LOCUS_TYPE *agent)
-   /* Returns in *new_guy a mutant of *agent having between 1 and
+/* Returns in *new_guy a mutant of *agent having between 1 and
       max_neigh_dist genes changes */
 {
-  int i, distance, pick_loc, locus;
+	int i, distance, pick_loc, locus;
 	int *remaining_locs;
 
-  if ((remaining_locs = (int *) malloc(N * sizeof(int))) == NULL) {
-    printf("Unable to allocate sufficient memory for remaining_locs.\nAborting.\n");
-    exit(-1);
-  }
+	if ((remaining_locs = (int *) malloc(N * sizeof(int))) == NULL) {
+		printf("Unable to allocate sufficient memory for remaining_locs.\nAborting.\n");
+		exit(-1);
+	}
 
-  /* Initialize new guy to old guy */
-  for (i=0; i<N; i++)
-    new_guy[i]=agent[i];
+	/* Initialize new guy to old guy */
+	for (i=0; i<N; i++)
+		new_guy[i]=agent[i];
 
-  /* Use faster code for the common case of 1-mutant neighbors */
-  if (max_neigh_dist==1) {  
+	/* Use faster code for the common case of 1-mutant neighbors */
+	if (max_neigh_dist==1) {
 
-    /* Pick a gene to mutate */
-    i=uniform(N);
+		/* Pick a gene to mutate */
+		i=uniform(N);
 
-    /* Find a NEW allele for this gene */
-    if ( (new_guy[i]=uniform(A-1)) >= agent[i] )
-      new_guy[i]++;
-  }
-  else {
-    /* Pick a distance for the mutant */
-    distance=uniform(max_neigh_dist) + 1;
+		/* Find a NEW allele for this gene */
+		if ( (new_guy[i]=uniform(A-1)) >= agent[i] )
+			new_guy[i]++;
+	}
+	else {
+		/* Pick a distance for the mutant */
+		distance=uniform(max_neigh_dist) + 1;
 
-    /* Build a list of allowable genes to mutate */
-    for (i=0; i<N; i++)
-      remaining_locs[i]=i;
+		/* Build a list of allowable genes to mutate */
+		for (i=0; i<N; i++)
+			remaining_locs[i]=i;
 
-    /* Replace the alleles in <distance> genes with NEW alleles */ 
-    for (i=0; i<distance; i++) {
+		/* Replace the alleles in <distance> genes with NEW alleles */
+		for (i=0; i<distance; i++) {
 
-      /* Find a locus to mutate */
-      if (N-i)
-	pick_loc = uniform(N-i);
-      else
-	pick_loc = 0;
-      locus=remaining_locs[pick_loc];
+			/* Find a locus to mutate */
+			if (N-i)
+				pick_loc = uniform(N-i);
+			else
+				pick_loc = 0;
+			locus=remaining_locs[pick_loc];
 
-      /* Find a NEW allele for this locus */
-      if ( (new_guy[locus]=uniform(A-1)) >= agent[locus] )
-	new_guy[locus]++;
-      remaining_locs[pick_loc]=remaining_locs[N-1-i];
-    }
-  }
+			/* Find a NEW allele for this locus */
+			if ( (new_guy[locus]=uniform(A-1)) >= agent[locus] )
+				new_guy[locus]++;
+			remaining_locs[pick_loc]=remaining_locs[N-1-i];
+		}
+	}
 }
 
 float gasdev(double standard_deviation)
 /* From Numerical Recipes in C */
 {
-  static int iset=0;
-  static float gset;
-  float fac,r,v1,v2;
- 
-  if  (iset == 0) {
-    do {
-      v1=(float)(2.0*knuth_random()-1.0);
-      v2=(float)(2.0*knuth_random()-1.0);
-      r=v1*v1+v2*v2;
-    } while (r >= 1.0);
-    fac=(float)(sqrt(-2.0*log(r)/r) * standard_deviation);
-    gset=v1*fac;
-    iset=1;
-    return v2*fac;
-  } else {
-    iset=0;
-    return gset;
-  }
+	static int iset=0;
+	static float gset;
+	float fac,r,v1,v2;
+
+	if  (iset == 0) {
+		do {
+			v1=(float)(2.0*knuth_random()-1.0);
+			v2=(float)(2.0*knuth_random()-1.0);
+			r=v1*v1+v2*v2;
+		} while (r >= 1.0);
+		fac=(float)(sqrt(-2.0*log(r)/r) * standard_deviation);
+		gset=v1*fac;
+		iset=1;
+		return v2*fac;
+	} else {
+		iset=0;
+		return gset;
+	}
 }
 
 void write_results(LOCUS_TYPE *agents[])
 /* Write the results from the end of the run */
 {
-  int i, j;
-  time_t now;
- 
- if (walk_iteration==0) {       /* Write data file header - perhaps move this to init_vars? */
+	int i, j;
+	time_t now;
 
-    /* Write date and time stamp */
-    now = time((time_t *)NULL);
-    fprintf(fitsfp, "%.24s\n\n", ctime(&now));
-    
-    /* write walk parameters */
-    fprintf(fitsfp, "d= %12s    ", agent_dist_term);
-    fprintf(fitsfp, "N= %6d  ", N);
-    fprintf(fitsfp, "e= %4d    ", max_walk_length);
-    fprintf(fitsfp, "r= %4d    ", num_repeat_fit);
-    fprintf(fitsfp, "c= %d\n", store_fits);
+	if (walk_iteration==0) {       /* Write data file header - perhaps move this to init_vars? */
 
-    fprintf(fitsfp, "L= %12s    ", epi_locs);
-    fprintf(fitsfp, "K= %6d  ", K);
-    fprintf(fitsfp, "a= %4d    ", num_agents);
-    fprintf(fitsfp, "p= %4d    ", pole_dist);
-    fprintf(fitsfp, "g= %.3g\n", noise_gain);
+		/* Write date and time stamp */
+		now = time((time_t *)NULL);
+		fprintf(fitsfp, "%.24s\n\n", ctime(&now));
 
-    fprintf(fitsfp, "w= %12s    ", epi_density);
-    fprintf(fitsfp, "A= %6d  ", A);
-    fprintf(fitsfp, "s= %4d    ", seed);
-    fprintf(fitsfp, "v= %.5g\n", noise_var);
+		/* write walk parameters */
+		fprintf(fitsfp, "d= %12s    ", agent_dist_term);
+		fprintf(fitsfp, "N= %6d  ", N);
+		fprintf(fitsfp, "e= %4d    ", max_walk_length);
+		fprintf(fitsfp, "r= %4d    ", num_repeat_fit);
+		fprintf(fitsfp, "c= %d\n", store_fits);
 
-    fprintf(fitsfp, "W= %12s    ", adaptive_walk);
-    fprintf(fitsfp, "R= %6d  ", num_repeat_walk);
-    fprintf(fitsfp, "m= %4d    ", max_neigh_dist); 
-    fprintf(fitsfp, "n= %12s\n", noise_density);
-  }
+		fprintf(fitsfp, "L= %12s    ", epi_locs);
+		fprintf(fitsfp, "K= %6d  ", K);
+		fprintf(fitsfp, "a= %4d    ", num_agents);
+		fprintf(fitsfp, "p= %4d    ", pole_dist);
+		fprintf(fitsfp, "g= %.3g\n", noise_gain);
 
-  if (store_fits) {
-    fprintf(fitsfp, "walk %d\n", walk_iteration);
+		fprintf(fitsfp, "w= %12s    ", epi_density);
+		fprintf(fitsfp, "A= %6d  ", A);
+		fprintf(fitsfp, "s= %ld    ", seed);
+		fprintf(fitsfp, "v= %.5g\n", noise_var);
 
-    /* write agent final genotypes and fitnesses */
-    fprintf(fitsfp, "Agent final genotypes and true fitnesses\n");
-    for (i=0; i<num_agents; i++) {
-      fprintf(fitsfp, "%3d  ", i);
-      for (j=0; j<N; j++)
-	fprintf(fitsfp, "%3d", agents[i][j]);
-      fprintf(fitsfp, "   %f\n", true_fitness[i]);
-    }
-  }
+		fprintf(fitsfp, "W= %12s    ", adaptive_walk);
+		fprintf(fitsfp, "R= %6d  ", num_repeat_walk);
+		fprintf(fitsfp, "m= %4d    ", max_neigh_dist);
+		fprintf(fitsfp, "n= %12s\n", noise_density);
+	}
+
+	if (store_fits) {
+		fprintf(fitsfp, "walk %d\n", walk_iteration);
+
+		/* write agent final genotypes and fitnesses */
+		fprintf(fitsfp, "Agent final genotypes and true fitnesses\n");
+		for (i=0; i<num_agents; i++) {
+			fprintf(fitsfp, "%3d  ", i);
+			for (j=0; j<N; j++)
+				fprintf(fitsfp, "%3d", agents[i][j]);
+			fprintf(fitsfp, "   %f\n", true_fitness[i]);
+		}
+	}
 
 #if 0
-  if (store_histo) {
-    if ((histofp = fopen(histofilename, "a")) == NULL) {
-      printf("Can not open file %s.\nAborting.\n", histofilename);
-      exit (-3);
-    }
-    for (i=0; i<num_agents; i++)
-      fprintf(histofp, "%f\n", true_fitness[i]);
-    fclose(histofp);
-  }
+	if (store_histo) {
+		if ((histofp = fopen(histofilename, "a")) == NULL) {
+			printf("Can not open file %s.\nAborting.\n", histofilename);
+			exit (-3);
+		}
+		for (i=0; i<num_agents; i++)
+			fprintf(histofp, "%f\n", true_fitness[i]);
+		fclose(histofp);
+	}
 #endif
-  if (num_agents==1) {
+	if (num_agents==1) {
 
-    if (store_fits) {
-      /* Write estimated and true fitnesses for this walk and their differences */
-      fprintf(fitsfp, "try  estim fit    true fit     difference \n");
-      for (i=0; i<max_walk_length+1; i++)
-	fprintf(fitsfp, "%3d  %10.8f   %10.8f   %10.8f\n", i, avg_fit[i], tr_fit[i], dif_fit[i]);
-    }
+		if (store_fits) {
+			/* Write estimated and true fitnesses for this walk and their differences */
+			fprintf(fitsfp, "try  estim fit    true fit     difference \n");
+			for (i=0; i<max_walk_length+1; i++)
+				fprintf(fitsfp, "%3d  %10.8f   %10.8f   %10.8f\n", i, avg_fit[i], tr_fit[i], dif_fit[i]);
+		}
 
-    if (walk_iteration==num_repeat_walk-1) {  
+		if (walk_iteration==num_repeat_walk-1) {
 
-      /* Write cumulative statistics */
-      fprintf(fitsfp, "CUMULATIVE RESULTS\n");
-      fprintf(fitsfp, "try  estim fit    true fit\n");
-      for (i=0; i<max_walk_length+1; i++)
-	fprintf(fitsfp, "%3d  %10.8f   %10.8f\n", i, cum_avg_fit[i], cum_tr_fit[i]);
-    }
-  }
-  else {
-    
-    if (store_fits) {
-      /* Write average and maximum fitness for this walk */
-      fprintf(fitsfp, "Average and maximum fitnesses\n");
-      fprintf(fitsfp, "try  avg est fit  max est fit  avg true fit\n");
-      for (i=0; i<max_walk_length+1; i++)
-	fprintf(fitsfp, "%3d  %10.8f   %10.8f   %10.8f\n", i, avg_fit[i], max_fit[i], tr_fit[i]);
-    }
+			/* Write cumulative statistics */
+			fprintf(fitsfp, "CUMULATIVE RESULTS\n");
+			fprintf(fitsfp, "try  estim fit    true fit\n");
+			for (i=0; i<max_walk_length+1; i++)
+				fprintf(fitsfp, "%3d  %10.8f   %10.8f\n", i, cum_avg_fit[i], cum_tr_fit[i]);
+		}
+	}
+	else {
 
-    if (walk_iteration==num_repeat_walk-1) {  
-    
-      /* Write cumulative statistics */
-      fprintf(fitsfp, "CUMULATIVE RESULTS\n");
-      fprintf(fitsfp, "try   avg fit      max fit      true fit\n");
-      for (i=0; i<max_walk_length+1; i++)
-	fprintf(fitsfp, "%3d  %10.8f   %10.8f   %10.8f\n", i, cum_avg_fit[i], cum_max_fit[i], cum_tr_fit[i]);
-    }
-  }
+		if (store_fits) {
+			/* Write average and maximum fitness for this walk */
+			fprintf(fitsfp, "Average and maximum fitnesses\n");
+			fprintf(fitsfp, "try  avg est fit  max est fit  avg true fit\n");
+			for (i=0; i<max_walk_length+1; i++)
+				fprintf(fitsfp, "%3d  %10.8f   %10.8f   %10.8f\n", i, avg_fit[i], max_fit[i], tr_fit[i]);
+		}
+
+		if (walk_iteration==num_repeat_walk-1) {
+
+			/* Write cumulative statistics */
+			fprintf(fitsfp, "CUMULATIVE RESULTS\n");
+			fprintf(fitsfp, "try   avg fit      max fit      true fit\n");
+			for (i=0; i<max_walk_length+1; i++)
+				fprintf(fitsfp, "%3d  %10.8f   %10.8f   %10.8f\n", i, cum_avg_fit[i], cum_max_fit[i], cum_tr_fit[i]);
+		}
+	}
 
 }
 
 int hamming(LOCUS_TYPE *agent1, LOCUS_TYPE *agent2)
 /* Find Hamming distance between agent1 and agent2 */
 {
-  int i;
-  int dist = 0;
+	int i;
+	int dist = 0;
 
-  for (i=0; i<N; i++)
-    dist+=(agent1[i]!=agent2[i]);
-  return dist;
+	for (i=0; i<N; i++)
+		dist+=(agent1[i]!=agent2[i]);
+	return dist;
 }
 
 void raise_flags(int flag_number, LOCUS_TYPE *agents[])
 /* Stores a copy of the genotypes of the agents in the appropriate part of flagpoles */
 {
-  int i;
+	int i;
 
-  for (i=0; i<num_agents; i++)
-    memcpy((flagpoles + flag_number*num_agents*N + i*N), agents[i], N);
+	for (i=0; i<num_agents; i++)
+		memcpy((flagpoles + flag_number*num_agents*N + i*N), agents[i], N);
 }
 
 void print_flags(int flag_number)
 /* Displays the flags of try flag_number */
 {
-  int i, j;
+	int i, j;
 
-  printf("flags # %d [  0] ", flag_number);
-  for (j=0; j<N; j++)
-    printf("%d", *(flagpoles + flag_number*num_agents*N + j));
-  printf("\n");
-  for (i=1; i<num_agents; i++) {
-    printf("          [%3d] ", i); 
-    for (j=0; j<N; j++)
-      printf("%d", *(flagpoles + flag_number*num_agents*N + i*N + j));
-    printf("\n");
-  }
+	printf("flags # %d [  0] ", flag_number);
+	for (j=0; j<N; j++)
+		printf("%d", *(flagpoles + flag_number*num_agents*N + j));
+	printf("\n");
+	for (i=1; i<num_agents; i++) {
+		printf("          [%3d] ", i);
+		for (j=0; j<N; j++)
+			printf("%d", *(flagpoles + flag_number*num_agents*N + i*N + j));
+		printf("\n");
+	}
 }
 
 void find_peaks(void)
 /* Function to use find_peaks_neigh to loop through all points in the landscape
    and build an array of the local peaks.  Uses w_best_guy as a dummy agent  */
 {
-  int i, j;
+	int i, j;
 
-  num_peaks = 0;
+	num_peaks = 0;
 
-  for (i=0; i<N; i++)
-    w_best_guy[i]=0;
+	for (i=0; i<N; i++)
+		w_best_guy[i]=0;
 
-  for (i=0; i<=N; i++)
-    find_peaks_neigh(w_best_guy, i, 0);
+	for (i=0; i<=N; i++)
+		find_peaks_neigh(w_best_guy, i, 0);
 
-  /* Write header information for subtitle in xvgr */
-  fprintf(hammingfp, "P2\n%d %d\n%d\n", num_peaks, max_walk_length, N);
-  fprintf(hammingfp,
-	  "# \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%e\"\n",
-	  N, K, A, max_walk_length, max_neigh_dist, seed, epi_locs[0], noise_density[0],
-	  adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var);
+	/* Write header information for subtitle in xvgr */
+	fprintf(hammingfp, "P2\n%d %d\n%d\n", num_peaks, max_walk_length, N);
+	fprintf(hammingfp,
+			"# \"N=%d K=%d A=%d e=%d m=%d s=%ld L=%c n=%c W=%c a=%d d=%c R=%d v=%e\"\n",
+			N, K, A, max_walk_length, max_neigh_dist, seed, epi_locs[0], noise_density[0],
+			adaptive_walk[0], num_agents, agent_dist_term[0], num_repeat_walk, noise_var);
 
-  /* Write peaks to output file as comments */
-    for (i=0; i<num_peaks; i++) {
-      fprintf(hammingfp, "#peak[%d]: ", i);
-      for (j=0; j<N; j++)
-	fprintf(hammingfp, "%3d ", peaks[i][j]);
-      fprintf(hammingfp, "\n");
-    }
+	/* Write peaks to output file as comments */
+	for (i=0; i<num_peaks; i++) {
+		fprintf(hammingfp, "#peak[%d]: ", i);
+		for (j=0; j<N; j++)
+			fprintf(hammingfp, "%3d ", peaks[i][j]);
+		fprintf(hammingfp, "\n");
+	}
 }
 
 void find_peaks_neigh(LOCUS_TYPE *agent, int distance, int loop_loc)
@@ -1416,100 +1722,100 @@ void find_peaks_neigh(LOCUS_TYPE *agent, int distance, int loop_loc)
    all peaks in the landscape.  See loop_all_neighbors for comments on this code.
    Returns number of peaks found */
 {
-  int i, j, temp;
-  double tfit;
+	int i, j, temp;
+	double tfit;
 
-  if (distance==0) {
-    tfit = calc_fit(agent);
-    if (is_peak(agent, tfit)) {
+	if (distance==0) {
+		tfit = calc_fit(agent);
+		if (is_peak(agent, tfit)) {
 
-      /* Allocate memory to store genotype of new peak
+			/* Allocate memory to store genotype of new peak
 	 peaks is an array of pointers to arrays length N arrays of LOCUS_TYPE */
-      if ((peaks[num_peaks] = (LOCUS_TYPE *) calloc(1, N*sizeof(LOCUS_TYPE))) == NULL) {
-	printf("Unable to allocate sufficient memory for peak[%d].\nAborting.\n", num_peaks+1);
-	exit(-1);
-      }
+			if ((peaks[num_peaks] = (LOCUS_TYPE *) calloc(1, N*sizeof(LOCUS_TYPE))) == NULL) {
+				printf("Unable to allocate sufficient memory for peak[%d].\nAborting.\n", num_peaks+1);
+				exit(-1);
+			}
 
-      /* Copy peak to growing array of peaks */
-      memcpy(peaks[num_peaks], agent, N);
+			/* Copy peak to growing array of peaks */
+			memcpy(peaks[num_peaks], agent, N);
 
-      /* Keep track of the number of peaks */
-      num_peaks++;
-    }
-  }
-  else
-    for (i=loop_loc; i<N-distance+1; i++) {
-      temp=agent[i];
-      for (j=0; j<temp; j++) {
-	agent[i]=j;
-	find_peaks_neigh(agent, distance-1, i+1);
-      }
-      for (j=temp+1; j<A; j++) {
-	agent[i]=j;
-	find_peaks_neigh(agent, distance-1, i+1);
-      }
-      agent[i]=temp;
-    }
+			/* Keep track of the number of peaks */
+			num_peaks++;
+		}
+	}
+	else
+		for (i=loop_loc; i<N-distance+1; i++) {
+			temp=agent[i];
+			for (j=0; j<temp; j++) {
+				agent[i]=j;
+				find_peaks_neigh(agent, distance-1, i+1);
+			}
+			for (j=temp+1; j<A; j++) {
+				agent[i]=j;
+				find_peaks_neigh(agent, distance-1, i+1);
+			}
+			agent[i]=temp;
+		}
 }
 
 int is_peak(LOCUS_TYPE *agent, double agents_fitness)
 /* Returns 1 agent is a 1-mutant neighbor local peak, else returns 0.
    agents_fitness is the fitness of agent */
 {
-  int i, j, temp;
-  
-  if (A==2)
-    /* Faster code for common special case of A=2 */
-    for (i=0; i<N; i++) {
-      agent[i] = 1-agent[i];
-      if (calc_fit(agent) >= agents_fitness) {
-	agent[i] = 1-agent[i];
-	return(0);
-      }
-      else
-	agent[i] = 1-agent[i];
-    }
-  else {
-    /* General case */
-    for (i=0; i<N; i++) {
-      temp = agent[i];
-      for (j=0; j<temp; j++) {
-	agent[i] = j;
-	if (calc_fit(agent) >= agents_fitness) {
-	  agent[i] = temp;
-	  return(0);
+	int i, j, temp;
+
+	if (A==2)
+		/* Faster code for common special case of A=2 */
+		for (i=0; i<N; i++) {
+			agent[i] = 1-agent[i];
+			if (calc_fit(agent) >= agents_fitness) {
+				agent[i] = 1-agent[i];
+				return(0);
+			}
+			else
+				agent[i] = 1-agent[i];
+		}
+	else {
+		/* General case */
+		for (i=0; i<N; i++) {
+			temp = agent[i];
+			for (j=0; j<temp; j++) {
+				agent[i] = j;
+				if (calc_fit(agent) >= agents_fitness) {
+					agent[i] = temp;
+					return(0);
+				}
+			}
+			for (j=temp+1; j<N; j++) {
+				agent[i] = j;
+				if (calc_fit(agent) >= agents_fitness) {
+					agent[i] = temp;
+					return(0);
+				}
+			}
+			agent[i] = temp;
+		}
 	}
-      }
-      for (j=temp+1; j<N; j++) {
-	agent[i] = j;
-	if (calc_fit(agent) >= agents_fitness) {
-	  agent[i] = temp;
-	  return(0);
-	}
-      }
-      agent[i] = temp;
-    }
-  }
-  return(1);
+	return(1);
 }
 
 void next_point(LOCUS_TYPE *guy)
 /* Returns the agent in the N-dimension, A-allele space that numerically follows
    the passed agent guy.  If guy = AAA . . . AAA, returns 000 . . . 000. */
 {
-  int i, increment = 1;
+	int i, increment = 1;
 
-  for (i=N-1; i>=0; i--) {
-    if (increment)
-      if (guy[i]<A-1) {
-	guy[i]++;
-	increment=0;
-      }
-      else {
-	guy[i]=0;
-	increment=1;
-      }
-  }
+	for (i=N-1; i>=0; i--) {
+		if (increment)
+			if (guy[i]<A-1) {
+				guy[i]++;
+				increment=0;
+			}
+			else {
+				guy[i]=0;
+				increment=1;
+			}
+	}
 }
 
 long new_random_point(LOCUS_TYPE *agent)
@@ -1520,66 +1826,66 @@ long new_random_point(LOCUS_TYPE *agent)
    Does NOT check if points_left == 0 - for speed.
    Formally returns the index of the selected point. */
 {
-  long temp, index;
+	long temp, index;
 
-  /* Pick a point from the remaining points_left points */
-  temp = luniform(points_left);
+	/* Pick a point from the remaining points_left points */
+	temp = luniform(points_left);
 
-  /* Find the index at location temp */
-  index = points_list[temp];
+	/* Find the index at location temp */
+	index = points_list[temp];
 
-  /* Put the string for this point into agent */
-  index_to_agent(agent, index);
+	/* Put the string for this point into agent */
+	index_to_agent(agent, index);
 
-  /* Update the points_list array and decrement the number of points left */
-  points_list[temp] = points_list[points_left-1];
-  points_left--;
+	/* Update the points_list array and decrement the number of points left */
+	points_list[temp] = points_list[points_left-1];
+	points_left--;
 
-  /* Return the index */
-  return(index);
+	/* Return the index */
+	return(index);
 }
-                                                                                
+
 
 long calc_index(LOCUS_TYPE *agent)
 /* Calculates and returns an index unique to each agent
    The index varies from 0 to A^N - 1 */
 {
-  int i;
-  long index = 0;
+	int i;
+	long index = 0;
 
-  for (i=0; i<N; i++)
-    index += agent[N-i-1] * (int)pow(A, i);
+	for (i=0; i<N; i++)
+		index += agent[N-i-1] * (int)pow(A, i);
 
-  return (index);
+	return (index);
 }
 
 void index_to_agent(LOCUS_TYPE *agent, long index)
 /* Returns point in NA space corresponding to passed index.  Does not check if index
    is in the range of 0 - A^N-1, returns a non-sensible value if index is out of this range */
 {
-  int i;
+	int i;
 
-  for (i=0; i<N; i++) {
-    agent[i]=(LOCUS_TYPE)floor(index/pow(A, N-i-1));
-    index %= (long)pow(A, N-i-1);
-  }
+	for (i=0; i<N; i++) {
+		agent[i]=(LOCUS_TYPE)floor(index/pow(A, N-i-1));
+		index %= (long)pow(A, N-i-1);
+	}
 }
 
 void close_files_free_memory(LOCUS_TYPE *agents[])
 /* Closes output files and frees memory from agents */
 {
 
-  int i;
+	int i;
 
-  fclose(fitsfp);
-  if (store_flags)
-    fclose(polefp);
-  if (store_agents)
-    fclose(agentsfp);
-  if (store_hamming)
-    fclose(hammingfp);
+	fclose(fitsfp);
+	if (store_flags)
+		fclose(polefp);
+	if (store_agents)
+		fclose(agentsfp);
+	if (store_hamming)
+		fclose(hammingfp);
 
-  /* Free memory allocated for agents[] */
-  for (i=0; i<num_agents; i++)
-    free(agents[i]);
+	/* Free memory allocated for agents[] */
+	for (i=0; i<num_agents; i++)
+		free(agents[i]);
 }

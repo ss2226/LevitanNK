@@ -4,9 +4,6 @@
 // Does not execute any time.h-based functions
 // 1/5/98
 // Bennett Levitan
-#ifndef lint
-static char *rcsid = "$Header: /disks/disk1/Users/terry/s/me/random-numbers/RCS/random.c,v 1.4 1992/09/11 18:41:47 terry Exp $";
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,7 +108,7 @@ static char *rcsid = "$Header: /disks/disk1/Users/terry/s/me/random-numbers/RCS/
 #define TIME 0
 
 #if TIME
-  #include <sys/time.h>
+#include <sys/time.h>
 #endif
 
 #define DUMPS
@@ -122,7 +119,7 @@ static char *rcsid = "$Header: /disks/disk1/Users/terry/s/me/random-numbers/RCS/
 
 /*
 #define MBIG  1000000000
-*/
+ */
 
 #define MSEED 161803398
 #define FAC   (1.0 / MBIG)
@@ -143,177 +140,177 @@ static long ma_3[56];
 double
 knuth_random()
 {
-  long mj;
-    
-  if (++inext == 56){
-    inext = 1;
-  }
-    
-  if (++inextp == 56){
-    inextp = 1;
-  }
+	long mj;
 
-  mj = ma[inext] - ma[inextp];
-    
-  if (mj < 0){
-    mj += MBIG;
-  }
+	if (++inext == 56){
+		inext = 1;
+	}
 
-  ma[inext] = mj;
-  return mj * FAC;
+	if (++inextp == 56){
+		inextp = 1;
+	}
+
+	mj = ma[inext] - ma[inextp];
+
+	if (mj < 0){
+		mj += MBIG;
+	}
+
+	ma[inext] = mj;
+	return mj * FAC;
 }
 
 long
 seed_random(seed)
-     long seed;
+long seed;
 {
-  long mj;
-  long mk;
-  register int i;
-  register int k;
-  
-  if (seed < 0){
-#if TIME
-    extern int gettimeofday();
+	long mj;
+	long mk;
+	register int i;
+	register int k;
 
-    struct timeval tp;
-    if (gettimeofday(&tp, (struct timezone *)0) == -1){
-      fprintf(stderr, "Could not gettimeofday in knuth_srand().");
-      exit(1);
-    }
-	
-    seed = tp.tv_sec;
+	if (seed < 0){
+#if TIME
+extern int gettimeofday();
+
+struct timeval tp;
+if (gettimeofday(&tp, (struct timezone *)0) == -1){
+	fprintf(stderr, "Could not gettimeofday in knuth_srand().");
+	exit(1);
+}
+
+seed = tp.tv_sec;
 #else
-		printf("Not set up to find the time on the PC\n");
-		printf("Do not use a negative seed.\nAborting\n.");
-		exit(-1);
-		}
+printf("Not set up to find the time on the PC\n");
+printf("Do not use a negative seed.\nAborting\n.");
+exit(-1);
+	}
 #endif
-  if (seed >= MBIG){
-    fprintf(stderr, "Seed value too big (> %d) in knuth_srand().\n", MBIG);
-    exit(1);
-  }
-  
-  ma[55] = mj = seed;
-  mk = 1;
-  
-  for (i = 1; i <= 54; i++){
-    register int ii = (21 * i) % 55;
-    ma[ii] = mk;
-    mk = mj - mk;
-    if (mk < 0){
-      mk += MBIG;
-    }
-    mj = ma[ii];
-  }
-  
-  for (k = 0; k < 4; k++){
-    for (i = 1; i <= 55; i++){
-      ma[i] -= ma[1 + (i + 30) % 55];
-      if (ma[i] < 0){
-	ma[i] += MBIG;
-      }
-    }
-  }
-  
-  inext = 0;
-  inextp = 31;
-  
-  return seed;
+	if (seed >= MBIG){
+		fprintf(stderr, "Seed value too big (> %d) in knuth_srand().\n", MBIG);
+		exit(1);
+	}
+
+	ma[55] = mj = seed;
+	mk = 1;
+
+	for (i = 1; i <= 54; i++){
+		register int ii = (21 * i) % 55;
+		ma[ii] = mk;
+		mk = mj - mk;
+		if (mk < 0){
+			mk += MBIG;
+		}
+		mj = ma[ii];
+	}
+
+	for (k = 0; k < 4; k++){
+		for (i = 1; i <= 55; i++){
+			ma[i] -= ma[1 + (i + 30) % 55];
+			if (ma[i] < 0){
+				ma[i] += MBIG;
+			}
+		}
+	}
+
+	inext = 0;
+	inextp = 31;
+
+	return seed;
 }
 
 double knuth_seed_to_random(long seed)
 {
-  /* Sets the seed to seed and gives the first random number that results
+	/* Sets the seed to seed and gives the first random number that results
      Uses a different set of variables than knuth_random so this routine does
      not interfere with the sequence of random numbers given by knuth_random
      Does not check for negative seed or too large a seed!
      Bennett Levitan */
-  long mj;
-  long mk;
-  register int i;
-  register int k;
-  
+	long mj;
+	long mk;
+	register int i;
+	register int k;
 
-/* Set seed */
-  ma_3[55] = mj = seed;
-  mk = 1;
-  
-  for (i = 1; i <= 54; i++){
-    register int ii = (21 * i) % 55;
-    ma_3[ii] = mk;
-    mk = mj - mk;
-    if (mk < 0){
-      mk += MBIG;
-    }
-    mj = ma_3[ii];
-  }
-  
-  for (k = 0; k < 4; k++){
-    for (i = 1; i <= 55; i++){
-      ma_3[i] -= ma_3[1 + (i + 30) % 55];
-      if (ma_3[i] < 0){
-	ma_3[i] += MBIG;
-      }
-    }
-  }
-  
-  /* Generate the random number */
 
-  mj = ma_3[1] - ma_3[32];
-  if (mj < 0)
-    mj += MBIG;
-  return mj * FAC;
+	/* Set seed */
+	ma_3[55] = mj = seed;
+	mk = 1;
+
+	for (i = 1; i <= 54; i++){
+		register int ii = (21 * i) % 55;
+		ma_3[ii] = mk;
+		mk = mj - mk;
+		if (mk < 0){
+			mk += MBIG;
+		}
+		mj = ma_3[ii];
+	}
+
+	for (k = 0; k < 4; k++){
+		for (i = 1; i <= 55; i++){
+			ma_3[i] -= ma_3[1 + (i + 30) % 55];
+			if (ma_3[i] < 0){
+				ma_3[i] += MBIG;
+			}
+		}
+	}
+
+	/* Generate the random number */
+
+	mj = ma_3[1] - ma_3[32];
+	if (mj < 0)
+		mj += MBIG;
+	return mj * FAC;
 }
 
 #ifdef DUMPS
 
 void
 dump_random_state(fp)
-     FILE *fp;
+FILE *fp;
 {
-  register int i;
+	register int i;
 
-  if (!fp){
-    fprintf(stderr, "dump_random_state() called with NULL file pointer.");
-    exit(1);
-  }
+	if (!fp){
+		fprintf(stderr, "dump_random_state() called with NULL file pointer.");
+		exit(1);
+	}
 
-  fprintf(fp, "%d\n%d\n", inext, inextp);
-    
-  for (i = 0; i < 56; i++){
-    fprintf(fp, "%d\n", ma[i]);
-  } 
-    
-  return;
+	fprintf(fp, "%d\n%d\n", inext, inextp);
+
+	for (i = 0; i < 56; i++){
+		fprintf(fp, "%ld\n", ma[i]);
+	}
+
+	return;
 }
 
 #define readline if (!(fgets(line, 1024, fp))) { fprintf(stderr, "fgets fails in app_restore_state."); exit(1); }
 
 void
 restore_random_state(fp)
-     FILE *fp;
+FILE *fp;
 {
-  extern int atoi();
-  char line[1024];
-  register int i;
-    
-  if (!fp){
-    fprintf(stderr, "restore_random_state() caled with NULL file pointer.");
-    exit(1);
-  }
+	extern int atoi();
+	char line[1024];
+	register int i;
 
-  readline; 
-  inext = atoi(line);
-  readline; 
-  inextp = atoi(line);
-    
-  for (i = 0; i < 56; i++){
-    readline; 
-    ma[i] = atoi(line);
-  }
+	if (!fp){
+		fprintf(stderr, "restore_random_state() caled with NULL file pointer.");
+		exit(1);
+	}
 
-  return;
+	readline;
+	inext = atoi(line);
+	readline;
+	inextp = atoi(line);
+
+	for (i = 0; i < 56; i++){
+		readline;
+		ma[i] = atoi(line);
+	}
+
+	return;
 }
 #endif /* DUMPS */
 
@@ -321,24 +318,24 @@ restore_random_state(fp)
 void put_random_state(void)
 /* Stores present state of knuth_random generator */
 {
-  int i;
+	int i;
 
-  inext_2 = inext;
-  inextp_2 = inextp;
-  for (i=1; i<56; i++)  /* Would memncpy be faster? */
-    ma_2[i] = ma[i];
+	inext_2 = inext;
+	inextp_2 = inextp;
+	for (i=1; i<56; i++)  /* Would memncpy be faster? */
+		ma_2[i] = ma[i];
 }
 
 /* Bennett Levitan addition */
 void get_random_state(void)
 /* Restores state of knuth_random generator from time when put_random_state was called */
 {
-  int i;
+	int i;
 
-  inext = inext_2;
-  inextp = inextp_2;
-  for (i=1; i<56; i++)
-    ma[i] = ma_2[i];
+	inext = inext_2;
+	inextp = inextp_2;
+	for (i=1; i<56; i++)
+		ma[i] = ma_2[i];
 }
 
 #ifdef CATCH_OTHER_GENERATORS
@@ -346,24 +343,24 @@ void get_random_state(void)
 double
 drand48()
 {
-    fprintf(stderr, "drand48() should not be used - use knuth_random instead!");
-    exit(1);
-		return(0);
+	fprintf(stderr, "drand48() should not be used - use knuth_random instead!");
+	exit(1);
+	return(0);
 }
 
 void
 srand48()
 {
-    fprintf(stderr, "srand48() should not be used - see the README file for help.");
-    exit(1);
+	fprintf(stderr, "srand48() should not be used - see the README file for help.");
+	exit(1);
 }
 
 int
 rand()
 {
-    fprintf(stderr, "drand() should not be used - use knuth_random instead!");
-    exit(1);
-		return(0);
+	fprintf(stderr, "drand() should not be used - use knuth_random instead!");
+	exit(1);
+	return(0);
 }
 /*
 int
@@ -373,20 +370,20 @@ srand()
     exit(1);
 		return(0);
 }
-*/
+ */
 long
 random()
 {
-    fprintf(stderr, "random() should not be used - use uniform() instead!");
-    exit(1);
-		return(0);
+	fprintf(stderr, "random() should not be used - use uniform() instead!");
+	exit(1);
+	return(0);
 }
 
 void
 srandom()
 {
-    fprintf(stderr, "srandom() should not be used - see the README file for help.");
-    exit(1);
+	fprintf(stderr, "srandom() should not be used - see the README file for help.");
+	exit(1);
 }
 
 char *
@@ -395,17 +392,17 @@ unsigned seed;
 char *state;
 int n;
 {
-    fprintf(stderr, "initstate() should not be used - see the README file for help.");
-    exit(1);
-		return(0);
+	fprintf(stderr, "initstate() should not be used - see the README file for help.");
+	exit(1);
+	return(0);
 }
 
 char *
 setstate(state)
 char *state;
 {
-    fprintf(stderr, "setstate() should not be used - see the README file for help.");
-    exit(1);
-		return(0);
+	fprintf(stderr, "setstate() should not be used - see the README file for help.");
+	exit(1);
+	return(0);
 }
 #endif
